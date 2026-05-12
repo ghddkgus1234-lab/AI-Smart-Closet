@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 
 // ✅ Gemini API 키 (Vercel 환경변수: REACT_APP_GEMINI_API_KEY)
-const GEMINI_API_KEY = 'AIzaSyAXNF9bCeAv7P6xWc5e_cB9wlId_qYFL2I';
+const GEMINI_API_KEY = 'AIzaSyANEAPkXz80KPYQBFePE25nfoGWZj-0ECg';
 
 const SAMPLE_OUTFITS = [
   {
