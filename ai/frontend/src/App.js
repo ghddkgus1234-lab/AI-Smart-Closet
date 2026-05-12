@@ -58,13 +58,17 @@ function App() {
   });
   const [filter, setFilter] = useState('전체');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newItem, setNewItem] = useState({ name: '', category: '상의', color: '', imageUrl: '' });
+  const [newItem, setNewItem] = useState({ name: '', category: '상의', color: '', imageUrl: '', tempLabel: '' });
   const [previewUrl, setPreviewUrl] = useState('');
   const [recommendation, setRecommendation] = useState(null);
   const [weather, setWeather] = useState(null);
   const [weatherLoading, setWeatherLoading] = useState(true);
 
-  // 날씨 불러오기 (Open-Meteo, API 키 불필요, 서울 기준)
+  // ✅ AI 예측 관련 state
+  const [aiResult, setAiResult] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+
+  // 날씨 불러오기
   useEffect(() => {
     fetch('https://api.open-meteo.com/v1/forecast?latitude=37.5665&longitude=126.9780&current=temperature_2m,weathercode&timezone=Asia%2FSeoul')
       .then(res => res.json())
@@ -102,22 +106,76 @@ function App() {
     }
   }, [clothes]);
 
-  const handleImageUpload = (e) => {
+  // ✅ 카테고리 변경 시 AI 결과 초기화
+  const handleCategoryChange = (e) => {
+    setNewItem(prev => ({ ...prev, category: e.target.value, tempLabel: '' }));
+    setAiResult(null);
+  };
+
+  // ✅ 이미지 업로드 + AI 예측
+  const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    // 미리보기
     const reader = new FileReader();
     reader.onloadend = () => {
       setPreviewUrl(reader.result);
       setNewItem(prev => ({ ...prev, imageUrl: reader.result }));
     };
     reader.readAsDataURL(file);
+
+    // 신발은 AI 미지원
+    const categoryToEndpoint = { '상의': 'top', '하의': 'bottoms', '아우터': 'outer' };
+    const endpoint = categoryToEndpoint[newItem.category];
+    if (!endpoint) return;
+
+    setAiLoading(true);
+    setAiResult(null);
+
+    // 이미지를 base64로 변환 후 Gradio API 호출
+    const toBase64 = (file) => new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result); // "data:image/...;base64,..."
+      reader.readAsDataURL(file);
+    });
+
+    try {
+      const base64Image = await toBase64(file);
+      const categoryLabel = newItem.category; // "상의" / "하의" / "아우터"
+
+      const res = await fetch(
+        'https://jangso-smart-closet-ai.hf.space/run/predict',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: [base64Image, categoryLabel] }),
+        }
+      );
+      if (!res.ok) throw new Error('서버 오류');
+      const json = await res.json();
+
+      // Gradio 응답: { data: ["따뜻(16~24°C) (91.2%)", { "더움(25°C~)": 3.1, ... }] }
+      const labelStr = json.data[0];         // "따뜻(16~24°C) (91.2%)"
+      const allProbs = json.data[1] || {};   // { "더움(25°C~)": 3.1, ... }
+      const label    = labelStr.split(' (')[0]; // "따뜻(16~24°C)"
+      const confidence = labelStr.match(/\((.+)%\)/)?.[1] || '';
+
+      setAiResult({ label, confidence, all_probs: allProbs });
+      setNewItem(prev => ({ ...prev, tempLabel: label }));
+    } catch (err) {
+      setAiResult({ error: 'AI 서버에 연결할 수 없습니다. 허깅페이스 Space가 실행 중인지 확인해주세요.' });
+    } finally {
+      setAiLoading(false);
+    }
   };
 
   const handleAddClothes = () => {
     if (!newItem.name) return alert('이름을 입력해주세요!');
     setClothes(prev => [...prev, { ...newItem, id: Date.now() }]);
-    setNewItem({ name: '', category: '상의', color: '', imageUrl: '' });
+    setNewItem({ name: '', category: '상의', color: '', imageUrl: '', tempLabel: '' });
     setPreviewUrl('');
+    setAiResult(null);
     setShowAddModal(false);
   };
 
@@ -173,6 +231,9 @@ function App() {
                   <img src={recommendation.top.imageUrl} alt={recommendation.top.name} style={styles.outfitImg} />
                   <span style={styles.outfitItemLabel}>{recommendation.top.name}</span>
                   <span style={styles.outfitTag}>상의</span>
+                  {recommendation.top.tempLabel && (
+                    <span style={styles.outfitTempTag}>{recommendation.top.tempLabel}</span>
+                  )}
                 </div>
               )}
               {recommendation?.bottom && (
@@ -180,6 +241,9 @@ function App() {
                   <img src={recommendation.bottom.imageUrl} alt={recommendation.bottom.name} style={styles.outfitImg} />
                   <span style={styles.outfitItemLabel}>{recommendation.bottom.name}</span>
                   <span style={styles.outfitTag}>하의</span>
+                  {recommendation.bottom.tempLabel && (
+                    <span style={styles.outfitTempTag}>{recommendation.bottom.tempLabel}</span>
+                  )}
                 </div>
               )}
               {recommendation?.outer && (
@@ -187,6 +251,9 @@ function App() {
                   <img src={recommendation.outer.imageUrl} alt={recommendation.outer.name} style={styles.outfitImg} />
                   <span style={styles.outfitItemLabel}>{recommendation.outer.name}</span>
                   <span style={styles.outfitTag}>아우터</span>
+                  {recommendation.outer.tempLabel && (
+                    <span style={styles.outfitTempTag}>{recommendation.outer.tempLabel}</span>
+                  )}
                 </div>
               )}
               {!recommendation?.top && !recommendation?.bottom && !recommendation?.outer && (
@@ -244,6 +311,10 @@ function App() {
               <div style={styles.tagGroup}>
                 {item.color && <span style={styles.tag}>{item.color}</span>}
                 <span style={styles.tag}>{item.category}</span>
+                {/* ✅ AI가 분류한 온도 구간 뱃지 */}
+                {item.tempLabel && (
+                  <span style={styles.tempTag}>🌡 {item.tempLabel}</span>
+                )}
               </div>
               <button onClick={() => handleDelete(item.id)} style={styles.deleteBtn}>🗑 삭제</button>
             </div>
@@ -264,20 +335,69 @@ function App() {
             <h3 style={{ marginBottom: '20px', color: '#1E293B' }}>👕 새 옷 추가</h3>
             <input placeholder="옷 이름 (예: 화이트 셔츠)" value={newItem.name}
               onChange={e => setNewItem(prev => ({ ...prev, name: e.target.value }))} style={styles.input} />
-            <select value={newItem.category}
-              onChange={e => setNewItem(prev => ({ ...prev, category: e.target.value }))} style={styles.input}>
+
+            {/* ✅ 카테고리 변경 시 AI 결과 초기화 */}
+            <select value={newItem.category} onChange={handleCategoryChange} style={styles.input}>
               {['상의', '하의', '아우터', '신발'].map(cat => <option key={cat} value={cat}>{cat}</option>)}
             </select>
+
             <input placeholder="색상 (예: 화이트, 블랙)" value={newItem.color}
               onChange={e => setNewItem(prev => ({ ...prev, color: e.target.value }))} style={styles.input} />
             <label style={styles.uploadLabel}>
-              📷 사진 업로드
+              📷 사진 업로드 {['상의','하의','아우터'].includes(newItem.category) ? '(업로드 시 AI 자동 분류)' : ''}
               <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
             </label>
-            {previewUrl && <img src={previewUrl} alt="미리보기" style={{ width: '100%', borderRadius: '12px', marginBottom: '16px', maxHeight: '200px', objectFit: 'cover' }} />}
+
+            {/* 미리보기 */}
+            {previewUrl && (
+              <img src={previewUrl} alt="미리보기" style={{ width: '100%', borderRadius: '12px', marginBottom: '16px', maxHeight: '200px', objectFit: 'cover' }} />
+            )}
+
+            {/* ✅ AI 분석 중 */}
+            {aiLoading && (
+              <p style={{ textAlign: 'center', color: '#4C6EF5', marginBottom: '12px', fontWeight: '600' }}>
+                🤖 AI 분석 중...
+              </p>
+            )}
+
+            {/* ✅ AI 결과 표시 */}
+            {aiResult && !aiResult.error && (
+              <div style={styles.aiResultBox}>
+                <p style={styles.aiResultTitle}>
+                  🌡 AI 추천 온도 구간: <span style={{ color: '#4C6EF5' }}>{aiResult.label}</span>
+                  <span style={styles.aiConfidence}>({aiResult.confidence}%)</span>
+                </p>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
+                  {Object.entries(aiResult.all_probs).map(([label, prob]) => (
+                    <span key={label} style={{
+                      backgroundColor: label === aiResult.label ? '#4C6EF5' : '#F1F5F9',
+                      color: label === aiResult.label ? 'white' : '#64748B',
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      fontSize: '0.8rem',
+                      fontWeight: '500',
+                    }}>
+                      {label}: {prob}%
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ✅ AI 에러 */}
+            {aiResult?.error && (
+              <p style={{ color: '#EF4444', fontSize: '0.85rem', marginBottom: '12px' }}>
+                ⚠️ {aiResult.error}
+              </p>
+            )}
+
             <div style={{ display: 'flex', gap: '12px' }}>
               <button onClick={handleAddClothes} style={styles.confirmBtn}>추가하기</button>
-              <button onClick={() => { setShowAddModal(false); setPreviewUrl(''); }} style={styles.cancelBtn}>취소</button>
+              <button onClick={() => {
+                setShowAddModal(false);
+                setPreviewUrl('');
+                setAiResult(null);
+              }} style={styles.cancelBtn}>취소</button>
             </div>
           </div>
         </div>
@@ -305,6 +425,7 @@ const styles = {
   outfitImg: { width: '120px', height: '140px', objectFit: 'cover', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' },
   outfitItemLabel: { fontSize: '0.9rem', fontWeight: '600', color: '#1E293B' },
   outfitTag: { backgroundColor: '#4C6EF5', color: 'white', padding: '4px 10px', borderRadius: '8px', fontSize: '0.75rem' },
+  outfitTempTag: { backgroundColor: '#ECFDF5', color: '#059669', padding: '4px 10px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '600' },
   reshuffleBtn: { backgroundColor: '#4C6EF5', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '1rem' },
   sampleNote: { color: '#94A3B8', marginBottom: '20px', fontSize: '1rem' },
   sampleGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '24px' },
@@ -326,14 +447,19 @@ const styles = {
   clothesName: { fontSize: '1.1rem', color: '#1E293B', marginBottom: '12px' },
   tagGroup: { display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' },
   tag: { backgroundColor: '#F1F5F9', padding: '6px 12px', borderRadius: '10px', fontSize: '0.85rem', color: '#64748B', fontWeight: '500' },
+  tempTag: { backgroundColor: '#ECFDF5', color: '#059669', padding: '6px 12px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: '600' },
   deleteBtn: { backgroundColor: '#FEE2E2', color: '#EF4444', border: 'none', padding: '8px 16px', borderRadius: '10px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' },
   emptyState: { gridColumn: '1 / -1', textAlign: 'center', padding: '80px 20px', backgroundColor: '#FFFFFF', borderRadius: '32px', border: '2px dashed #E2E8F0', color: '#94A3B8' },
   modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
-  modal: { backgroundColor: 'white', borderRadius: '24px', padding: '40px', width: '90%', maxWidth: '480px', boxShadow: '0 25px 50px rgba(0,0,0,0.15)' },
+  modal: { backgroundColor: 'white', borderRadius: '24px', padding: '40px', width: '90%', maxWidth: '480px', boxShadow: '0 25px 50px rgba(0,0,0,0.15)', maxHeight: '90vh', overflowY: 'auto' },
   input: { width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '1rem', marginBottom: '16px', boxSizing: 'border-box', outline: 'none' },
   uploadLabel: { display: 'block', textAlign: 'center', padding: '14px', borderRadius: '12px', border: '2px dashed #CBD5E0', cursor: 'pointer', color: '#64748B', fontWeight: '600', marginBottom: '16px' },
   confirmBtn: { flex: 1, backgroundColor: '#4C6EF5', color: 'white', border: 'none', padding: '14px', borderRadius: '12px', cursor: 'pointer', fontWeight: '700', fontSize: '1rem' },
   cancelBtn: { flex: 1, backgroundColor: '#F1F5F9', color: '#64748B', border: 'none', padding: '14px', borderRadius: '12px', cursor: 'pointer', fontWeight: '700', fontSize: '1rem' },
+  // ✅ AI 결과 박스
+  aiResultBox: { backgroundColor: '#EEF2FF', borderRadius: '12px', padding: '14px 18px', marginBottom: '16px', border: '1.5px solid #4C6EF5' },
+  aiResultTitle: { margin: 0, fontWeight: '700', color: '#1E293B', fontSize: '0.95rem' },
+  aiConfidence: { color: '#94A3B8', fontWeight: '400', marginLeft: '8px' },
 };
 
 export default App;
