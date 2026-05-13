@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 
 // ✅ Gemini API 키 (Vercel 환경변수: REACT_APP_GEMINI_API_KEY)
-const GEMINI_API_KEY = 'AIzaSyANEAPkXz80KPYQBFePE25nfoGWZj-0ECg';
+const GEMINI_API_KEY = 'AIzaSyD6ctDEw_EgNCH23AeIIfbusKr3USqwny4';
 
 const SAMPLE_OUTFITS = [
   {
@@ -13,7 +13,7 @@ const SAMPLE_OUTFITS = [
     tags: ['캐주얼', '데일리', '봄/여름'],
   },
   {
-    id: 2,
+    id: 2,  
     title: '오피스 룩',
     description: '블라우스 + 슬랙스 + 플랫슈즈',
     weather: '모든 날씨',
