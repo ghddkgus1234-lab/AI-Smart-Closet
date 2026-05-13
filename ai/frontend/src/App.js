@@ -242,6 +242,78 @@ function App() {
     setNickname('');
   };
 
+const handleCategoryChange = (e) => {
+    setNewItem(prev => ({ ...prev, category: e.target.value, tempLabel: '' }));
+    setAiResult(null);
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPreviewUrl(reader.result);
+      setNewItem(prev => ({ ...prev, imageUrl: reader.result }));
+    };
+    reader.readAsDataURL(file);
+
+    const categoryToEndpoint = { '상의': 'top', '하의': 'bottoms', '아우터': 'outer' };
+    const endpoint = categoryToEndpoint[newItem.category];
+    if (!endpoint) return;
+
+    setAiLoading(true);
+    setAiResult(null);
+
+    const toBase64 = (f) => new Promise((resolve) => {
+      const r = new FileReader();
+      r.onloadend = () => resolve(r.result);
+      r.readAsDataURL(f);
+    });
+
+    try {
+      const base64Image = await toBase64(file);
+      const res = await fetch('https://jangso-smart-closet-ai.hf.space/run/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: [base64Image, newItem.category] }),
+      });
+      if (!res.ok) throw new Error('서버 오류');
+      const json = await res.json();
+      const labelStr = json.data[0];
+      const allProbs = json.data[1] || {};
+      const label = labelStr.split(' (')[0];
+      const confidence = labelStr.match(/\((.+)%\)/)?.[1] || '';
+      setAiResult({ label, confidence, all_probs: allProbs });
+      setNewItem(prev => ({ ...prev, tempLabel: label }));
+    } catch {
+      setAiResult({ error: 'AI 서버에 연결할 수 없습니다.' });
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleAddClothes = () => {
+    if (!newItem.name) return alert('이름을 입력해주세요!');
+    setClothes(prev => [...prev, { ...newItem, id: Date.now() }]);
+    setNewItem({ name: '', category: '상의', color: '', imageUrl: '', tempLabel: '' });
+    setPreviewUrl('');
+    setAiResult(null);
+    setShowAddModal(false);
+  };
+
+  const handleDelete = (id) => setClothes(prev => prev.filter(c => c.id !== id));
+
+  const reshuffleRecommendation = () => {
+    const tops = clothes.filter(c => c.category === '상의');
+    const bottoms = clothes.filter(c => c.category === '하의');
+    const outers = clothes.filter(c => c.category === '아우터');
+    setRecommendation({
+      top: tops[Math.floor(Math.random() * tops.length)],
+      bottom: bottoms[Math.floor(Math.random() * bottoms.length)],
+      outer: outers[Math.floor(Math.random() * outers.length)],
+    });
+  };
+
   // 4. 조건부 렌더링(return)은 Hook 선언이 모두 끝난 뒤에 위치
   if (!token) {
     return <AuthPage onLogin={handleLogin} />;
