@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import AuthPage from './AuthPage';
+
 
 // ✅ Gemini API 키 (Vercel 환경변수: REACT_APP_GEMINI_API_KEY)
 const GEMINI_API_KEY = 'AIzaSyBI_A-SOy-AHi_pkkBSePfjYyGIZofMl1s';
@@ -168,13 +170,19 @@ const chatStyles = {
   sendBtn: { backgroundColor: '#4C6EF5', color: 'white', border: 'none', padding: '10px 16px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600' },
 };
 
+
 function App() {
+  // 2. 모든 Hook은 return문보다 위에 선언
+  const [nickname, setNickname] = useState(localStorage.getItem('nickname') || '');
+  const [token, setToken] = useState(localStorage.getItem('token') || '');
+  
   const [clothes, setClothes] = useState(() => {
     try {
       const saved = localStorage.getItem('closet_clothes');
       return saved ? JSON.parse(saved) : [];
     } catch { return []; }
   });
+  
   const [filter, setFilter] = useState('전체');
   const [showAddModal, setShowAddModal] = useState(false);
   const [newItem, setNewItem] = useState({ name: '', category: '상의', color: '', imageUrl: '', tempLabel: '' });
@@ -185,6 +193,7 @@ function App() {
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
 
+  // useEffect들도 모두 이 위치(최상위)에 유지
   useEffect(() => {
     fetch('https://api.open-meteo.com/v1/forecast?latitude=37.5665&longitude=126.9780&current=temperature_2m,weathercode&timezone=Asia%2FSeoul')
       .then(res => res.json())
@@ -220,85 +229,38 @@ function App() {
     }
   }, [clothes]);
 
-  const handleCategoryChange = (e) => {
-    setNewItem(prev => ({ ...prev, category: e.target.value, tempLabel: '' }));
-    setAiResult(null);
+  // 3. 비즈니스 로직 함수 정의
+  const handleLogin = (nick) => {
+    setNickname(nick);
+    setToken(localStorage.getItem('token'));
   };
 
-  const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPreviewUrl(reader.result);
-      setNewItem(prev => ({ ...prev, imageUrl: reader.result }));
-    };
-    reader.readAsDataURL(file);
-
-    const categoryToEndpoint = { '상의': 'top', '하의': 'bottoms', '아우터': 'outer' };
-    const endpoint = categoryToEndpoint[newItem.category];
-    if (!endpoint) return;
-
-    setAiLoading(true);
-    setAiResult(null);
-
-    const toBase64 = (f) => new Promise((resolve) => {
-      const r = new FileReader();
-      r.onloadend = () => resolve(r.result);
-      r.readAsDataURL(f);
-    });
-
-    try {
-      const base64Image = await toBase64(file);
-      const res = await fetch('https://jangso-smart-closet-ai.hf.space/run/predict', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: [base64Image, newItem.category] }),
-      });
-      if (!res.ok) throw new Error('서버 오류');
-      const json = await res.json();
-      const labelStr = json.data[0];
-      const allProbs = json.data[1] || {};
-      const label = labelStr.split(' (')[0];
-      const confidence = labelStr.match(/\((.+)%\)/)?.[1] || '';
-      setAiResult({ label, confidence, all_probs: allProbs });
-      setNewItem(prev => ({ ...prev, tempLabel: label }));
-    } catch {
-      setAiResult({ error: 'AI 서버에 연결할 수 없습니다. 허깅페이스 Space가 실행 중인지 확인해주세요.' });
-    } finally {
-      setAiLoading(false);
-    }
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('nickname');
+    setToken('');
+    setNickname('');
   };
 
-  const handleAddClothes = () => {
-    if (!newItem.name) return alert('이름을 입력해주세요!');
-    setClothes(prev => [...prev, { ...newItem, id: Date.now() }]);
-    setNewItem({ name: '', category: '상의', color: '', imageUrl: '', tempLabel: '' });
-    setPreviewUrl('');
-    setAiResult(null);
-    setShowAddModal(false);
-  };
-
-  const handleDelete = (id) => setClothes(prev => prev.filter(c => c.id !== id));
-
-  const reshuffleRecommendation = () => {
-    const tops = clothes.filter(c => c.category === '상의');
-    const bottoms = clothes.filter(c => c.category === '하의');
-    const outers = clothes.filter(c => c.category === '아우터');
-    setRecommendation({
-      top: tops[Math.floor(Math.random() * tops.length)],
-      bottom: bottoms[Math.floor(Math.random() * bottoms.length)],
-      outer: outers[Math.floor(Math.random() * outers.length)],
-    });
-  };
+  // 4. 조건부 렌더링(return)은 Hook 선언이 모두 끝난 뒤에 위치
+  if (!token) {
+    return <AuthPage onLogin={handleLogin} />;
+  }
 
   const filteredClothes = filter === '전체' ? clothes : clothes.filter(item => item.category === filter);
 
   return (
     <div style={styles.container}>
       <header style={styles.header}>
-        <h1 style={styles.title}>👗 AI Smart Closet</h1>
-        <p style={styles.subtitle}>오늘 당신에게 가장 잘 어울리는 옷을 찾아드려요.</p>
+      <h1 style={styles.title}>👗 AI Smart Closet</h1>
+      <p style={styles.subtitle}>오늘 당신에게 가장 잘 어울리는 옷을 찾아드려요.</p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginTop: '12px' }}>
+        <span style={{ color: '#4C6EF5', fontWeight: '700' }}>👤 {nickname}님</span>
+        <button onClick={handleLogout} style={{
+          backgroundColor: '#FEE2E2', color: '#EF4444', border: 'none',
+          padding: '8px 16px', borderRadius: '10px', cursor: 'pointer', fontWeight: '600'
+        }}>로그아웃</button>
+      </div>
       </header>
 
       <div style={styles.dashboard}>
