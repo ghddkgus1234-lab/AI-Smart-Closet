@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 
 // ✅ Gemini API 키 (Vercel 환경변수: REACT_APP_GEMINI_API_KEY)
-const GEMINI_API_KEY = 'AIzaSyD6ctDEw_EgNCH23AeIIfbusKr3USqwny4';
+const GEMINI_API_KEY = 'AIzaSyBI_A-SOy-AHi_pkkBSePfjYyGIZofMl1s';
 
 const SAMPLE_OUTFITS = [
   {
@@ -81,7 +81,7 @@ function Chatbot({ clothes, weather }) {
 
     try {
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
