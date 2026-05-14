@@ -13,29 +13,29 @@ router.post('/register', async (req, res) => {
     if (!email || !password || !nickname)
       return res.status(400).json({ message: '모든 항목을 입력해주세요' });
 
-    const [rows] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
-    if (rows.length > 0)
+    const checkResult = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (checkResult.rows.length > 0)
       return res.status(400).json({ message: '이미 사용 중인 이메일입니다' });
 
     const hashed = await bcrypt.hash(password, 10);
-    const [result] = await pool.query(
-      'INSERT INTO users (email, password, nickname) VALUES (?, ?, ?)',
+    const result = await pool.query(
+      'INSERT INTO users (email, password, nickname) VALUES ($1, $2, $3) RETURNING id',
       [email, hashed, nickname]
     );
 
-    res.status(201).json({ token: makeToken(result.insertId), nickname });
+    res.status(201).json({ token: makeToken(result.rows[0].id), nickname });
   } catch (err) {
-    console.error('회원가입 에러:', err); // 이 줄 추가
+    console.error('회원가입 에러:', err);
     res.status(500).json({ message: '서버 오류', error: err.message });
-}
+  }
 });
 
 // 로그인
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    const [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
-    const user = rows[0];
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    const user = result.rows[0];
 
     if (!user || !(await bcrypt.compare(password, user.password)))
       return res.status(401).json({ message: '이메일 또는 비밀번호가 틀렸습니다' });
@@ -48,11 +48,11 @@ router.post('/login', async (req, res) => {
 
 // 내 정보
 router.get('/me', require('../middleware/auth'), async (req, res) => {
-  const [rows] = await pool.query(
-    'SELECT id, email, nickname, created_at FROM users WHERE id = ?',
+  const result = await pool.query(
+    'SELECT id, email, nickname, created_at FROM users WHERE id = $1',
     [req.userId]
   );
-  res.json(rows[0]);
+  res.json(result.rows[0]);
 });
 
 module.exports = router;

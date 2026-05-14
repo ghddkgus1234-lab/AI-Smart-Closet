@@ -5,7 +5,6 @@ const pool     = require('../db');
 const fs       = require('fs');
 const FormData = require('form-data');
 
-// 날씨 기반 카테고리 추천 로직
 function getRecommendedCategories(temp) {
   if (temp >= 25) return ['상의', '하의'];
   if (temp >= 15) return ['상의', '하의', '아우터'];
@@ -13,7 +12,7 @@ function getRecommendedCategories(temp) {
   return ['상의', '하의', '아우터'];
 }
 
-// 오늘의 코디 추천 (날씨 기반)
+// 오늘의 코디 추천
 router.get('/today', auth, async (req, res) => {
   try {
     const { lat = 37.5665, lon = 126.9780 } = req.query;
@@ -31,12 +30,10 @@ router.get('/today', auth, async (req, res) => {
     }
 
     const categories = getRecommendedCategories(temp);
-
-    // 사용자 옷장에서 카테고리별 랜덤 1개씩 추천
     const result = {};
     for (const cat of categories) {
-      const [rows] = await pool.query(
-        'SELECT * FROM clothes WHERE user_id = ? AND category = ?',
+      const { rows } = await pool.query(
+        'SELECT * FROM clothes WHERE user_id = $1 AND category = $2',
         [req.userId, cat]
       );
       if (rows.length > 0) {
@@ -50,12 +47,12 @@ router.get('/today', auth, async (req, res) => {
   }
 });
 
-// 사진 기반 유사 옷 추천 (FastAPI 연동)
+// 유사 옷 추천
 router.post('/similar', auth, async (req, res) => {
   try {
     const { clothId } = req.body;
-    const [rows] = await pool.query(
-      'SELECT * FROM clothes WHERE id = ? AND user_id = ?',
+    const { rows } = await pool.query(
+      'SELECT * FROM clothes WHERE id = $1 AND user_id = $2',
       [clothId, req.userId]
     );
     if (rows.length === 0) return res.status(404).json({ message: '옷을 찾을 수 없습니다' });
