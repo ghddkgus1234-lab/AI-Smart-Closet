@@ -1,4 +1,4 @@
-const BASE = 'http://localhost:5000/api';
+const BASE = 'https://smartcloset-backend.onrender.com/api';
 
 function getToken() {
   return localStorage.getItem('token');
