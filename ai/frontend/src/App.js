@@ -1,21 +1,36 @@
 import React, { useState, useEffect, useRef } from 'react';
+import AuthPage from './AuthPage';
 
-const GEMINI_API_KEY = 'YOUR_GEMINI_API_KEY';
+
+// ✅ Gemini API 키 (Vercel 환경변수: REACT_APP_GEMINI_API_KEY)
+const GEMINI_API_KEY = 'AIzaSyANEAPkXz80KPYQBFePE25nfoGWZj-0ECg';
 
 // ✅ 샘플 코디 (AI 분류 결과 하드코딩)
 const SAMPLE_OUTFITS = [
-  // 상의
-  { id: 1, title: '크롭 반팔티', category: '상의', image: 'https://images.unsplash.com/photo-1562157873-818bc0726f68?w=400&q=80', tempLabel: '더움(25°C~)', confidence: 92.3 },
-  { id: 2, title: '린넨 블라우스', category: '상의', image: 'https://images.unsplash.com/photo-1598554747436-c9293d6a588f?w=400&q=80', tempLabel: '따뜻(16~24°C)', confidence: 88.7 },
-  { id: 3, title: '오버핏 후드티', category: '상의', image: 'https://images.unsplash.com/photo-1556821840-3a63f15732ce?w=400&q=80', tempLabel: '쌀쌀(9~15°C)', confidence: 85.1 },
-  // 하의
-  { id: 4, title: '데님 반바지', category: '하의', image: 'https://images.unsplash.com/photo-1591195853828-11db59a44f43?w=400&q=80', tempLabel: '더움(25°C~)', confidence: 90.5 },
-  { id: 5, title: '미디 스커트', category: '하의', image: 'https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=400&q=80', tempLabel: '따뜻(16~24°C)', confidence: 87.2 },
-  { id: 6, title: '슬림 슬랙스', category: '하의', image: 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400&q=80', tempLabel: '쌀쌀(9~15°C)', confidence: 83.4 },
-  // 아우터
-  { id: 7, title: '린넨 가디건', category: '아우터', image: 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=400&q=80', tempLabel: '따뜻(16~24°C)', confidence: 89.1 },
-  { id: 8, title: '데님 재킷', category: '아우터', image: 'https://images.unsplash.com/photo-1551537482-f2075a1d41f2?w=400&q=80', tempLabel: '쌀쌀(9~15°C)', confidence: 86.3 },
-  { id: 9, title: '롱 패딩', category: '아우터', image: 'https://images.unsplash.com/photo-1544923246-77307dd654cb?w=400&q=80', tempLabel: '추움(~8°C)', confidence: 94.2 },
+  {
+    id: 1,
+    title: '캐주얼 데일리룩',
+    description: '화이트 티셔츠 + 청바지 + 스니커즈',
+    weather: '15°C 이상',
+    image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400&q=80',
+    tags: ['캐주얼', '데일리', '봄/여름'],
+  },
+  {
+    id: 2,
+    title: '오피스 룩',
+    description: '블라우스 + 슬랙스 + 플랫슈즈',
+    weather: '모든 날씨',
+    image: 'https://images.unsplash.com/photo-1594938298603-c8148c4b4e51?w=400&q=80',
+    tags: ['오피스', '포멀', '올시즌'],
+  },
+  {
+    id: 3,
+    title: '스트릿 룩',
+    description: '후드티 + 조거팬츠 + 운동화',
+    weather: '10°C 이상',
+    image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=400&q=80',
+    tags: ['스트릿', '편안함', '가을'],
+  },
 ];
 
 function getWeatherDesc(code) {
@@ -76,7 +91,7 @@ function Chatbot({ clothes, weather }) {
 
     try {
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -163,13 +178,19 @@ const chatStyles = {
   sendBtn: { backgroundColor: '#4C6EF5', color: 'white', border: 'none', padding: '10px 16px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600' },
 };
 
+
 function App() {
+  // 2. 모든 Hook은 return문보다 위에 선언
+  const [nickname, setNickname] = useState(localStorage.getItem('nickname') || '');
+  const [token, setToken] = useState(localStorage.getItem('token') || '');
+  
   const [clothes, setClothes] = useState(() => {
     try {
       const saved = localStorage.getItem('closet_clothes');
       return saved ? JSON.parse(saved) : [];
     } catch { return []; }
   });
+  
   const [filter, setFilter] = useState('전체');
   const [showAddModal, setShowAddModal] = useState(false);
   const [newItem, setNewItem] = useState({ name: '', category: '상의', color: '', imageUrl: '', tempLabel: '', confidence: 0 });
@@ -179,6 +200,7 @@ function App() {
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
 
+  // useEffect들도 모두 이 위치(최상위)에 유지
   useEffect(() => {
     fetch('https://api.open-meteo.com/v1/forecast?latitude=37.5665&longitude=126.9780&current=temperature_2m,weathercode&timezone=Asia%2FSeoul')
       .then(res => res.json())
@@ -223,7 +245,7 @@ function App() {
   const { best, worst, isSample } = getBestWorst();
 
   const handleCategoryChange = (e) => {
-    setNewItem(prev => ({ ...prev, category: e.target.value, tempLabel: '', confidence: 0 }));
+    setNewItem(prev => ({ ...prev, category: e.target.value, tempLabel: '' }));
     setAiResult(null);
   };
 
@@ -282,13 +304,32 @@ function App() {
   };
 
   const handleDelete = (id) => setClothes(prev => prev.filter(c => c.id !== id));
+
+  const reshuffleRecommendation = () => {
+    const tops = clothes.filter(c => c.category === '상의');
+    const bottoms = clothes.filter(c => c.category === '하의');
+    const outers = clothes.filter(c => c.category === '아우터');
+    setRecommendation({
+      top: tops[Math.floor(Math.random() * tops.length)],
+      bottom: bottoms[Math.floor(Math.random() * bottoms.length)],
+      outer: outers[Math.floor(Math.random() * outers.length)],
+    });
+  };
+
   const filteredClothes = filter === '전체' ? clothes : clothes.filter(item => item.category === filter);
 
   return (
     <div style={styles.container}>
       <header style={styles.header}>
-        <h1 style={styles.title}>👗 AI Smart Closet</h1>
-        <p style={styles.subtitle}>오늘 당신에게 가장 잘 어울리는 옷을 찾아드려요.</p>
+      <h1 style={styles.title}>👗 AI Smart Closet</h1>
+      <p style={styles.subtitle}>오늘 당신에게 가장 잘 어울리는 옷을 찾아드려요.</p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginTop: '12px' }}>
+        <span style={{ color: '#4C6EF5', fontWeight: '700' }}>👤 {nickname}님</span>
+        <button onClick={handleLogout} style={{
+          backgroundColor: '#FEE2E2', color: '#EF4444', border: 'none',
+          padding: '8px 16px', borderRadius: '10px', cursor: 'pointer', fontWeight: '600'
+        }}>로그아웃</button>
+      </div>
       </header>
 
       {/* 날씨 대시보드 */}
