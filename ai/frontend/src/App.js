@@ -3,7 +3,7 @@ import AuthPage from './AuthPage';
 
 const GEMINI_API_KEY = 'AIzaSyBI_A-SOy-AHi_pkkBSePfjYyGIZofMl1s';
 
-// ✅ 상의 / 하의 / 아우터 별도 이미지로 전체 코디 구성
+// ✅ 샘플 코디 카드용 (상의/하의/신발 각각 이미지)
 const SAMPLE_OUTFITS = [
   {
     id: 1,
@@ -95,8 +95,8 @@ const SAMPLE_OUTFITS = [
         name: '조거팬츠',
         images: [
           'https://images.unsplash.com/photo-1552902865-b72c031ac5ea?w=300&q=80',
-          'https://images.unsplash.com/photo-1580906853359-7c1c3c0e5b1e?w=300&q=80',
           'https://images.unsplash.com/photo-1598033129183-c4f50c736f10?w=300&q=80',
+          'https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=300&q=80',
         ],
       },
       {
@@ -112,7 +112,19 @@ const SAMPLE_OUTFITS = [
   },
 ];
 
-// 아이템 라벨별 이모지
+// ✅ BEST/WORST 추천용 샘플 아이템 (images 배열 + fallback 지원)
+const SAMPLE_ITEMS = [
+  { id: 's1', title: '크롭 반팔티',   category: '상의',   images: ['https://images.unsplash.com/photo-1562157873-818bc0726f68?w=400&q=80',  'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&q=80'], tempLabel: '더움(25°C~)',    confidence: 92.3 },
+  { id: 's2', title: '린넨 블라우스', category: '상의',   images: ['https://images.unsplash.com/photo-1560243563-062bfc001d68?w=400&q=80',  'https://images.unsplash.com/photo-1617019114583-affb34d1b3cd?w=400&q=80'], tempLabel: '따뜻(16~24°C)', confidence: 88.7 },
+  { id: 's3', title: '오버핏 후드티', category: '상의',   images: ['https://images.unsplash.com/photo-1556821840-3a63f15732ce?w=400&q=80',  'https://images.unsplash.com/photo-1509631179647-0177331693ae?w=400&q=80'], tempLabel: '쌀쌀(9~15°C)',  confidence: 85.1 },
+  { id: 's4', title: '데님 반바지',   category: '하의',   images: ['https://images.unsplash.com/photo-1591195853828-11db59a44f43?w=400&q=80', 'https://images.unsplash.com/photo-1542272604-787c3835535d?w=400&q=80'],  tempLabel: '더움(25°C~)',    confidence: 90.5 },
+  { id: 's5', title: '미디 스커트',   category: '하의',   images: ['https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=400&q=80', 'https://images.unsplash.com/photo-1475178626620-a4d074967452?w=400&q=80'], tempLabel: '따뜻(16~24°C)', confidence: 87.2 },
+  { id: 's6', title: '슬림 슬랙스',   category: '하의',   images: ['https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=400&q=80', 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400&q=80'], tempLabel: '쌀쌀(9~15°C)',  confidence: 83.4 },
+  { id: 's7', title: '린넨 가디건',   category: '아우터', images: ['https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=400&q=80', 'https://images.unsplash.com/photo-1594938298603-c8148c4b4e51?w=400&q=80'], tempLabel: '따뜻(16~24°C)', confidence: 89.1 },
+  { id: 's8', title: '데님 재킷',     category: '아우터', images: ['https://images.unsplash.com/photo-1551537482-f2075a1d41f2?w=400&q=80',  'https://images.unsplash.com/photo-1503342394128-c104d54dba01?w=400&q=80'], tempLabel: '쌀쌀(9~15°C)',  confidence: 86.3 },
+  { id: 's9', title: '롱 패딩',       category: '아우터', images: ['https://images.unsplash.com/photo-1544923246-77307dd654cb?w=400&q=80',  'https://images.unsplash.com/photo-1556821840-3a63f15732ce?w=400&q=80'],  tempLabel: '추움(~8°C)',     confidence: 94.2 },
+];
+
 const labelEmoji = { '상의': '👕', '하의': '👖', '아우터': '🧥', '신발': '👟' };
 
 function getWeatherDesc(code) {
@@ -133,10 +145,53 @@ function getOutfitTip(temp) {
   if (temp >= 23) return '반팔 + 반바지 조합';
   if (temp >= 17) return '긴팔 셔츠 + 슬랙스';
   if (temp >= 10) return '맨투맨 + 청바지';
-  if (temp >= 5) return '코트 + 니트 추천';
+  if (temp >= 5)  return '코트 + 니트 추천';
   return '두꺼운 패딩 필수!';
 }
 
+function getTempLabel(temp) {
+  if (temp >= 25) return '더움(25°C~)';
+  if (temp >= 16) return '따뜻(16~24°C)';
+  if (temp >= 9)  return '쌀쌀(9~15°C)';
+  return '추움(~8°C)';
+}
+
+// ✅ BEST/WORST 카드용 이미지 컴포넌트 (순서대로 fallback 시도)
+function RecommendImage({ item, style }) {
+  const images = item.images || (item.imageUrl ? [item.imageUrl] : [item.image].filter(Boolean));
+  const [idx, setIdx] = useState(0);
+  const [failed, setFailed] = useState(false);
+
+  const handleError = () => {
+    if (idx + 1 < images.length) {
+      setIdx(prev => prev + 1);
+    } else {
+      setFailed(true);
+    }
+  };
+
+  if (failed || images.length === 0) {
+    return (
+      <div style={{ ...style, backgroundColor: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: '16px' }}>
+        <span style={{ fontSize: '48px' }}>
+          {item.category === '상의' ? '👕' : item.category === '하의' ? '👖' : item.category === '아우터' ? '🧥' : '👟'}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      key={idx}
+      src={images[idx]}
+      alt={item.name || item.title}
+      style={style}
+      onError={handleError}
+    />
+  );
+}
+
+// ✅ 챗봇 컴포넌트
 function Chatbot({ clothes, weather }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([
@@ -163,7 +218,7 @@ function Chatbot({ clothes, weather }) {
     const systemPrompt = `당신은 AI 스마트 옷장 코디 전문가입니다. 사용자의 옷장과 날씨 정보를 바탕으로 코디를 추천해주세요.\n현재 옷장: ${closetInfo}\n${weatherInfo}\n답변은 친근하고 간결하게 한국어로 해주세요. 이모지를 적절히 사용해주세요.`;
     try {
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -239,6 +294,7 @@ const chatStyles = {
   sendBtn: { backgroundColor: '#4C6EF5', color: 'white', border: 'none', padding: '10px 16px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600' },
 };
 
+
 function App() {
   const [nickname, setNickname] = useState(localStorage.getItem('nickname') || '');
   const [token, setToken] = useState(localStorage.getItem('token') || '');
@@ -250,7 +306,7 @@ function App() {
   });
   const [filter, setFilter] = useState('전체');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newItem, setNewItem] = useState({ name: '', category: '상의', color: '', imageUrl: '', tempLabel: '' });
+  const [newItem, setNewItem] = useState({ name: '', category: '상의', color: '', imageUrl: '', tempLabel: '', confidence: 0 });
   const [previewUrl, setPreviewUrl] = useState('');
   const [recommendation, setRecommendation] = useState(null);
   const [weather, setWeather] = useState(null);
@@ -258,8 +314,7 @@ function App() {
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
 
-  // ✅ 각 outfit의 각 item별로 랜덤 이미지 선택 상태
-  // 구조: { outfitId: { itemIndex: imageUrl } }
+  // 샘플 코디 카드 이미지 상태
   const [sampleImages, setSampleImages] = useState(() => {
     const init = {};
     SAMPLE_OUTFITS.forEach(outfit => {
@@ -271,7 +326,6 @@ function App() {
     return init;
   });
 
-  // ✅ 이미지 바꾸기: 각 아이템마다 현재와 다른 이미지로 교체
   const reshuffleSampleImages = () => {
     setSampleImages(prev => {
       const next = {};
@@ -323,6 +377,23 @@ function App() {
     }
   }, [clothes]);
 
+  // ✅ BEST 2 / WORST 1 계산
+  const getBestWorst = () => {
+    if (!weather || weather.temp === '--') return { best: [], worst: null, isSample: false };
+    const targetLabel = getTempLabel(weather.temp);
+    const source = clothes.length > 0 ? clothes : SAMPLE_ITEMS;
+    const isSample = clothes.length === 0;
+    const matched = source
+      .filter(c => c.tempLabel === targetLabel && c.confidence > 0)
+      .sort((a, b) => b.confidence - a.confidence);
+    const unmatched = source
+      .filter(c => c.tempLabel && c.tempLabel !== targetLabel && c.confidence > 0)
+      .sort((a, b) => b.confidence - a.confidence);
+    return { best: matched.slice(0, 2), worst: unmatched[0] || null, isSample };
+  };
+
+  const { best, worst, isSample } = getBestWorst();
+
   const handleLogin = (nick) => {
     setNickname(nick);
     setToken(localStorage.getItem('token'));
@@ -334,7 +405,7 @@ function App() {
     setNickname('');
   };
   const handleCategoryChange = (e) => {
-    setNewItem(prev => ({ ...prev, category: e.target.value, tempLabel: '' }));
+    setNewItem(prev => ({ ...prev, category: e.target.value, tempLabel: '', confidence: 0 }));
     setAiResult(null);
   };
   const handleImageUpload = async (e) => {
@@ -368,9 +439,9 @@ function App() {
       const labelStr = json.data[0];
       const allProbs = json.data[1] || {};
       const label = labelStr.split(' (')[0];
-      const confidence = labelStr.match(/\((.+)%\)/)?.[1] || '';
+      const confidence = parseFloat(labelStr.match(/\((.+)%\)/)?.[1] || '0');
       setAiResult({ label, confidence, all_probs: allProbs });
-      setNewItem(prev => ({ ...prev, tempLabel: label }));
+      setNewItem(prev => ({ ...prev, tempLabel: label, confidence }));
     } catch {
       setAiResult({ error: 'AI 서버에 연결할 수 없습니다.' });
     } finally {
@@ -380,7 +451,7 @@ function App() {
   const handleAddClothes = () => {
     if (!newItem.name) return alert('이름을 입력해주세요!');
     setClothes(prev => [...prev, { ...newItem, id: Date.now() }]);
-    setNewItem({ name: '', category: '상의', color: '', imageUrl: '', tempLabel: '' });
+    setNewItem({ name: '', category: '상의', color: '', imageUrl: '', tempLabel: '', confidence: 0 });
     setPreviewUrl('');
     setAiResult(null);
     setShowAddModal(false);
@@ -403,6 +474,7 @@ function App() {
 
   return (
     <div style={styles.container}>
+      {/* 헤더 */}
       <header style={styles.header}>
         <h1 style={styles.title}>👗 AI Smart Closet</h1>
         <p style={styles.subtitle}>오늘 당신에게 가장 잘 어울리는 옷을 찾아드려요.</p>
@@ -412,6 +484,7 @@ function App() {
         </div>
       </header>
 
+      {/* 날씨 대시보드 */}
       <div style={styles.dashboard}>
         <div style={styles.card}>
           <div style={{ fontSize: '36px' }}>{weatherLoading ? '⏳' : weather.emoji}</div>
@@ -425,8 +498,53 @@ function App() {
         </div>
       </div>
 
+      {/* ✅ BEST 2 / WORST 1 섹션 */}
       <section style={styles.recommendSection}>
         <h2 style={styles.sectionTitle}>✨ 오늘의 추천 코디</h2>
+        {isSample && (
+          <p style={styles.sampleNote}>📦 옷장이 비어있어요! 샘플 아이템으로 추천해드릴게요.</p>
+        )}
+        <div style={styles.bestWorstRow}>
+          {best.length > 0 ? best.map((item, idx) => (
+            <div key={item.id} style={styles.bestCard}>
+              <div style={styles.bestBadge}>🏆 BEST {idx + 1}{isSample ? ' (샘플)' : ''}</div>
+              {/* ✅ RecommendImage: images 배열 순서대로 fallback 시도 */}
+              <RecommendImage item={item} style={styles.recommendImg} />
+              <p style={styles.recommendName}>{item.name || item.title}</p>
+              <p style={styles.recommendCategory}>{item.category}</p>
+              <div style={styles.confidenceBar}>
+                <div style={{ ...styles.confidenceFill, width: `${item.confidence}%`, backgroundColor: '#4C6EF5' }} />
+              </div>
+              <p style={styles.confidenceText}>AI 확신도 {Number(item.confidence).toFixed(1)}%</p>
+              <span style={styles.tempTagGreen}>🌡 {item.tempLabel}</span>
+            </div>
+          )) : (
+            <div style={styles.emptyRecommend}>
+              <p>😅 오늘 날씨에 맞는 옷이 없어요!</p>
+              <p style={{ fontSize: '0.9rem', color: '#94A3B8' }}>옷을 더 추가해보세요.</p>
+            </div>
+          )}
+          {worst && (
+            <div style={styles.worstCard}>
+              <div style={styles.worstBadge}>❌ WORST{isSample ? ' (샘플)' : ''}</div>
+              {/* ✅ RecommendImage: images 배열 순서대로 fallback 시도 */}
+              <RecommendImage item={worst} style={styles.recommendImg} />
+              <p style={styles.recommendName}>{worst.name || worst.title}</p>
+              <p style={styles.recommendCategory}>{worst.category}</p>
+              <div style={styles.confidenceBar}>
+                <div style={{ ...styles.confidenceFill, width: `${worst.confidence}%`, backgroundColor: '#EF4444' }} />
+              </div>
+              <p style={styles.confidenceText}>AI 확신도 {Number(worst.confidence).toFixed(1)}%</p>
+              <span style={styles.tempTagRed}>🌡 {worst.tempLabel}</span>
+              <p style={styles.worstMsg}>오늘 날씨엔 비추천 🙅</p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ✅ 전체 코디 섹션 */}
+      <section style={styles.outfitSection}>
+        <h2 style={styles.sectionTitle}>👔 전체 코디 추천</h2>
         {clothes.length > 0 ? (
           <div style={styles.myOutfitCard}>
             <p style={styles.myOutfitLabel}>👚 내 옷장에서 추천</p>
@@ -463,23 +581,17 @@ function App() {
           </div>
         ) : (
           <div>
-            {/* 안내 + 이미지 바꾸기 버튼 */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-              <p style={{ color: '#94A3B8', fontSize: '1rem', margin: 0 }}>📦 옷장이 비어있어요! 아래 샘플 코디를 참고해보세요.</p>
+              <p style={{ color: '#94A3B8', fontSize: '1rem', margin: 0 }}>📦 샘플 코디로 전체 코디를 확인해보세요.</p>
               <button onClick={reshuffleSampleImages} style={styles.reshuffleSampleBtn}>🔀 이미지 바꾸기</button>
             </div>
-
-            {/* ✅ 샘플 코디 카드: 상의/하의/신발 각각 이미지 표시 */}
             <div style={styles.sampleGrid}>
               {SAMPLE_OUTFITS.map(outfit => (
                 <div key={outfit.id} style={styles.sampleCard}>
-                  {/* 카드 상단 타이틀 */}
                   <div style={styles.sampleCardHeader}>
                     <h3 style={styles.sampleTitle}>{outfit.title}</h3>
                     <span style={styles.sampleWeatherBadge}>🌡 {outfit.weather}</span>
                   </div>
-
-                  {/* ✅ 아이템별 이미지 3칸 가로 배열 */}
                   <div style={styles.sampleItemRow}>
                     {outfit.items.map((item, idx) => (
                       <div key={idx} style={styles.sampleItemCol}>
@@ -493,7 +605,6 @@ function App() {
                               if (fallbacks.length > 0) e.target.src = fallbacks[0];
                             }}
                           />
-                          {/* 라벨 뱃지 */}
                           <span style={styles.sampleItemBadge}>
                             {labelEmoji[item.label]} {item.label}
                           </span>
@@ -502,12 +613,8 @@ function App() {
                       </div>
                     ))}
                   </div>
-
-                  {/* 태그 */}
                   <div style={styles.tagGroup}>
-                    {outfit.tags.map(tag => (
-                      <span key={tag} style={styles.tag}>{tag}</span>
-                    ))}
+                    {outfit.tags.map(tag => <span key={tag} style={styles.tag}>{tag}</span>)}
                   </div>
                 </div>
               ))}
@@ -516,9 +623,10 @@ function App() {
         )}
       </section>
 
+      {/* 내 옷장 */}
       <main style={styles.main}>
         <div style={styles.closetHeader}>
-          <h2 style={styles.sectionTitle}>👔 내 옷장</h2>
+          <h2 style={styles.sectionTitle}>🗂 내 옷장</h2>
           <button onClick={() => setShowAddModal(true)} style={styles.addBtn}>+ 옷 추가</button>
         </div>
         <div style={styles.filterBar}>
@@ -543,6 +651,7 @@ function App() {
                 {item.color && <span style={styles.tag}>{item.color}</span>}
                 <span style={styles.tag}>{item.category}</span>
                 {item.tempLabel && <span style={styles.tempTag}>🌡 {item.tempLabel}</span>}
+                {item.confidence > 0 && <span style={styles.tag}>{Number(item.confidence).toFixed(1)}%</span>}
               </div>
               <button onClick={() => handleDelete(item.id)} style={styles.deleteBtn}>🗑 삭제</button>
             </div>
@@ -556,6 +665,7 @@ function App() {
         </div>
       </main>
 
+      {/* 옷 추가 모달 */}
       {showAddModal && (
         <div style={styles.modalOverlay}>
           <div style={styles.modal}>
@@ -622,8 +732,29 @@ const styles = {
   cardHighlight: { backgroundColor: '#EEF2FF', padding: '30px', borderRadius: '24px', width: '240px', textAlign: 'center', border: '2px solid #4C6EF5', boxShadow: '0 10px 25px -5px rgba(76,110,245,0.1)' },
   cardTitle: { fontSize: '1rem', color: '#475569', margin: '15px 0 5px 0' },
   cardContent: { fontSize: '1.1rem', fontWeight: '700', color: '#1E293B' },
-  recommendSection: { maxWidth: '1200px', margin: '0 auto 60px auto' },
+
+  // BEST/WORST
+  recommendSection: { maxWidth: '1100px', margin: '0 auto 60px auto' },
   sectionTitle: { fontSize: '1.5rem', fontWeight: '700', color: '#1E293B', marginBottom: '24px' },
+  sampleNote: { color: '#94A3B8', marginBottom: '20px', fontSize: '1rem' },
+  bestWorstRow: { display: 'flex', gap: '24px', flexWrap: 'wrap' },
+  bestCard: { backgroundColor: 'white', borderRadius: '24px', padding: '24px', textAlign: 'center', boxShadow: '0 4px 20px rgba(76,110,245,0.15)', border: '2px solid #4C6EF5', flex: '1', minWidth: '200px', maxWidth: '260px', position: 'relative' },
+  worstCard: { backgroundColor: 'white', borderRadius: '24px', padding: '24px', textAlign: 'center', boxShadow: '0 4px 20px rgba(239,68,68,0.15)', border: '2px solid #EF4444', flex: '1', minWidth: '200px', maxWidth: '260px', position: 'relative' },
+  bestBadge: { position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)', backgroundColor: '#4C6EF5', color: 'white', padding: '4px 16px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: '700', whiteSpace: 'nowrap' },
+  worstBadge: { position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)', backgroundColor: '#EF4444', color: 'white', padding: '4px 16px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: '700', whiteSpace: 'nowrap' },
+  recommendImg: { width: '100%', height: '160px', objectFit: 'cover', borderRadius: '16px', marginBottom: '12px', marginTop: '8px' },
+  recommendName: { fontWeight: '700', color: '#1E293B', fontSize: '1rem', marginBottom: '4px' },
+  recommendCategory: { color: '#64748B', fontSize: '0.85rem', marginBottom: '10px' },
+  confidenceBar: { width: '100%', height: '8px', backgroundColor: '#F1F5F9', borderRadius: '4px', marginBottom: '6px', overflow: 'hidden' },
+  confidenceFill: { height: '100%', borderRadius: '4px', transition: 'width 0.5s ease' },
+  confidenceText: { fontSize: '0.8rem', color: '#64748B', marginBottom: '8px' },
+  tempTagGreen: { backgroundColor: '#ECFDF5', color: '#059669', padding: '4px 12px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: '600' },
+  tempTagRed: { backgroundColor: '#FEF2F2', color: '#EF4444', padding: '4px 12px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: '600' },
+  worstMsg: { color: '#EF4444', fontSize: '0.85rem', marginTop: '8px', fontWeight: '600' },
+  emptyRecommend: { textAlign: 'center', padding: '40px', backgroundColor: 'white', borderRadius: '24px', color: '#64748B', border: '2px dashed #E2E8F0' },
+
+  // 전체 코디 섹션
+  outfitSection: { maxWidth: '1200px', margin: '0 auto 60px auto' },
   myOutfitCard: { backgroundColor: '#EEF2FF', borderRadius: '24px', padding: '30px', border: '2px solid #4C6EF5' },
   myOutfitLabel: { color: '#4C6EF5', fontWeight: '700', marginBottom: '20px', fontSize: '1rem' },
   outfitRow: { display: 'flex', gap: '20px', flexWrap: 'wrap', marginBottom: '20px' },
@@ -635,14 +766,12 @@ const styles = {
   reshuffleBtn: { backgroundColor: '#4C6EF5', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '1rem' },
   reshuffleSampleBtn: { backgroundColor: 'white', color: '#4C6EF5', border: '2px solid #4C6EF5', padding: '10px 20px', borderRadius: '12px', cursor: 'pointer', fontWeight: '700', fontSize: '0.95rem', whiteSpace: 'nowrap' },
 
-  // ✅ 샘플 카드 새 스타일
+  // 샘플 코디 카드
   sampleGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '28px' },
   sampleCard: { backgroundColor: 'white', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '16px' },
   sampleCardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   sampleTitle: { fontSize: '1.15rem', fontWeight: '700', color: '#1E293B', margin: 0 },
   sampleWeatherBadge: { backgroundColor: '#EEF2FF', color: '#4C6EF5', padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem', fontWeight: '600', whiteSpace: 'nowrap' },
-
-  // ✅ 아이템 3칸 가로 배열
   sampleItemRow: { display: 'flex', gap: '10px' },
   sampleItemCol: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' },
   sampleImgWrap: { position: 'relative', width: '100%' },
@@ -650,9 +779,12 @@ const styles = {
   sampleItemBadge: { position: 'absolute', bottom: '6px', left: '50%', transform: 'translateX(-50%)', backgroundColor: 'rgba(0,0,0,0.55)', color: 'white', padding: '2px 8px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: '600', whiteSpace: 'nowrap' },
   sampleItemName: { fontSize: '0.82rem', color: '#475569', fontWeight: '600', margin: 0, textAlign: 'center' },
 
+  // 공통
   tagGroup: { display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' },
   tag: { backgroundColor: '#F1F5F9', padding: '6px 12px', borderRadius: '10px', fontSize: '0.85rem', color: '#64748B', fontWeight: '500' },
+  tempTag: { backgroundColor: '#ECFDF5', color: '#059669', padding: '6px 12px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: '600' },
 
+  // 내 옷장
   main: { maxWidth: '1100px', margin: '0 auto' },
   closetHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' },
   addBtn: { backgroundColor: '#4C6EF5', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '14px', cursor: 'pointer', fontWeight: '600', fontSize: '1rem' },
@@ -663,9 +795,10 @@ const styles = {
   clothesImg: { width: '100%', height: '160px', objectFit: 'cover', borderRadius: '16px', marginBottom: '16px' },
   icon: { fontSize: '60px', marginBottom: '20px' },
   clothesName: { fontSize: '1.1rem', color: '#1E293B', marginBottom: '12px' },
-  tempTag: { backgroundColor: '#ECFDF5', color: '#059669', padding: '6px 12px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: '600' },
   deleteBtn: { backgroundColor: '#FEE2E2', color: '#EF4444', border: 'none', padding: '8px 16px', borderRadius: '10px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' },
   emptyState: { gridColumn: '1 / -1', textAlign: 'center', padding: '80px 20px', backgroundColor: '#FFFFFF', borderRadius: '32px', border: '2px dashed #E2E8F0', color: '#94A3B8' },
+
+  // 모달
   modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
   modal: { backgroundColor: 'white', borderRadius: '24px', padding: '40px', width: '90%', maxWidth: '480px', boxShadow: '0 25px 50px rgba(0,0,0,0.15)', maxHeight: '90vh', overflowY: 'auto' },
   input: { width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '1rem', marginBottom: '16px', boxSizing: 'border-box', outline: 'none' },
