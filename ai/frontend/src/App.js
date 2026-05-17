@@ -114,17 +114,49 @@ const SAMPLE_OUTFITS = [
 
 // ✅ 오늘의 추천 코디 BEST/WORST용 샘플 (옷장이 비었을 때만 사용)
 const SAMPLE_ITEMS = [
-  { id: 's1', title: '크롭 반팔티',   category: '상의',   images: ['https://images.unsplash.com/photo-1562157873-818bc0726f68?w=400&q=80',  'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&q=80'], tempLabel: '더움(25°C~)',    confidence: 92.3 },
-  { id: 's2', title: '린넨 블라우스', category: '상의',   images: ['https://images.unsplash.com/photo-1560243563-062bfc001d68?w=400&q=80',  'https://images.unsplash.com/photo-1617019114583-affb34d1b3cd?w=400&q=80'], tempLabel: '따뜻(16~24°C)', confidence: 88.7 },
-  { id: 's3', title: '오버핏 후드티', category: '상의',   images: ['https://images.unsplash.com/photo-1556821840-3a63f15732ce?w=400&q=80',  'https://images.unsplash.com/photo-1509631179647-0177331693ae?w=400&q=80'], tempLabel: '쌀쌀(9~15°C)',  confidence: 85.1 },
-  { id: 's4', title: '데님 반바지',   category: '하의',   images: ['https://images.unsplash.com/photo-1591195853828-11db59a44f43?w=400&q=80', 'https://images.unsplash.com/photo-1542272604-787c3835535d?w=400&q=80'],  tempLabel: '더움(25°C~)',    confidence: 90.5 },
-  { id: 's5', title: '미디 스커트',   category: '하의',   images: ['https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=400&q=80', 'https://images.unsplash.com/photo-1475178626620-a4d074967452?w=400&q=80'], tempLabel: '따뜻(16~24°C)', confidence: 87.2 },
-  { id: 's6', title: '슬림 슬랙스',   category: '하의',   images: ['https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=400&q=80', 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400&q=80'], tempLabel: '쌀쌀(9~15°C)',  confidence: 83.4 },
-  { id: 's7', title: '린넨 가디건',   category: '아우터', images: ['https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=400&q=80', 'https://images.unsplash.com/photo-1594938298603-c8148c4b4e51?w=400&q=80'], tempLabel: '따뜻(16~24°C)', confidence: 89.1 },
-  { id: 's8', title: '데님 재킷',     category: '아우터', images: ['https://images.unsplash.com/photo-1551537482-f2075a1d41f2?w=400&q=80',  'https://images.unsplash.com/photo-1503342394128-c104d54dba01?w=400&q=80'], tempLabel: '쌀쌀(9~15°C)',  confidence: 86.3 },
-  { id: 's9', title: '롱 패딩',       category: '아우터', images: ['https://images.unsplash.com/photo-1544923246-77307dd654cb?w=400&q=80',  'https://images.unsplash.com/photo-1556821840-3a63f15732ce?w=400&q=80'],  tempLabel: '추움(~8°C)',     confidence: 94.2 },
+  { id: 's1', title: '크롭 반팔티',   category: '상의',   images: [
+    'https://images.unsplash.com/photo-1562157873-818bc0726f68?w=400&q=80',
+    'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&q=80',
+  ], tempLabel: '더움(25°C~)',    confidence: 92.3 },
+  
+  { id: 's2', title: '린넨 블라우스', category: '상의',   images: [
+    'https://images.unsplash.com/photo-1551163943-3f7fb896e0f4?w=400&q=80',  // 블라우스
+    'https://images.unsplash.com/photo-1598554747436-c9293d6a588f?w=400&q=80', // 여성 상의
+  ], tempLabel: '따뜻(16~24°C)', confidence: 88.7 },
+  
+  { id: 's3', title: '오버핏 후드티', category: '상의', images: [
+  'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=400&q=80',
+], tempLabel: '쌀쌀(9~15°C)', confidence: 85.1 },
+  
+  { id: 's4', title: '데님 반바지',   category: '하의',   images: [
+    'https://images.unsplash.com/photo-1591195853828-11db59a44f43?w=400&q=80',
+    'https://images.unsplash.com/photo-1565084888279-aca607bb7e1e?w=400&q=80',
+  ], tempLabel: '더움(25°C~)',    confidence: 90.5 },
+  
+  { id: 's5', title: '미디 스커트',   category: '하의',   images: [
+    'https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=400&q=80',
+    'https://images.unsplash.com/photo-1571945153237-4929e783af4a?w=400&q=80',
+  ], tempLabel: '따뜻(16~24°C)', confidence: 87.2 },
+  
+  { id: 's6', title: '슬림 슬랙스',   category: '하의',   images: [
+    'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400&q=80',
+    'https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=400&q=80',
+  ], tempLabel: '쌀쌀(9~15°C)',  confidence: 83.4 },
+  
+  { id: 's7', title: '린넨 가디건',   category: '아우터', images: [
+    'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=400&q=80',
+    'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=400&q=80',
+  ], tempLabel: '따뜻(16~24°C)', confidence: 89.1 },
+  
+  { id: 's8', title: '데님 재킷',     category: '아우터', images: [
+    'https://images.unsplash.com/photo-1551537482-f2075a1d41f2?w=400&q=80',
+    'https://images.unsplash.com/photo-1503342394128-c104d54dba01?w=400&q=80',
+  ], tempLabel: '쌀쌀(9~15°C)',  confidence: 86.3 },
+  
+  { id: 's9', title: '롱 패딩', category: '아우터', images: [
+  'https://images.unsplash.com/photo-1611025504703-8c143abe6996?w=400&q=80',
+], tempLabel: '추움(~8°C)', confidence: 94.2 },
 ];
-
 const labelEmoji = { '상의': '👕', '하의': '👖', '아우터': '🧥', '신발': '👟' };
 
 function getWeatherDesc(code) {
