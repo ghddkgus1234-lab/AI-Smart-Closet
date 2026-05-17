@@ -157,8 +157,13 @@ function getTempLabel(temp) {
 }
 
 // ✅ BEST/WORST 카드 이미지 — 순서대로 fallback 시도
+// 내 옷장 옷(imageUrl)과 샘플(images 배열) 모두 처리
 function RecommendImage({ item, style }) {
-  const images = item.images || (item.imageUrl ? [item.imageUrl] : []);
+  const images = item.images
+    ? item.images
+    : item.imageUrl
+      ? [item.imageUrl]
+      : [];
   const [idx, setIdx] = useState(0);
   const [failed, setFailed] = useState(false);
 
@@ -310,7 +315,7 @@ function App() {
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
 
-  // ✅ 전체 코디 추천 카드 이미지 상태 (항상 샘플 유지)
+  // 전체 코디 추천 카드 이미지 상태 (항상 샘플)
   const [sampleImages, setSampleImages] = useState(() => {
     const init = {};
     SAMPLE_OUTFITS.forEach(outfit => {
@@ -358,24 +363,57 @@ function App() {
     localStorage.setItem('closet_clothes', JSON.stringify(clothes));
   }, [clothes]);
 
-  // ✅ BEST 2 / WORST 1 계산
-  // 옷장에 옷이 있으면 → 내 옷장 기반
-  // 옷장이 비어있으면 → SAMPLE_ITEMS 기반
+  // ✅ BEST/WORST 계산 — 3단계 우선순위로 처리
+  // 1순위: tempLabel 일치 + confidence > 0 (AI 분류된 옷)
+  // 2순위: tempLabel 없는 옷 (사진 없이 추가한 옷) → BEST로 표시
+  // 옷장이 비어있으면: SAMPLE_ITEMS 사용
   const getBestWorst = () => {
-    if (!weather || weather.temp === '--') return { best: [], worst: null, isSample: false };
+    if (!weather || weather.temp === '--') {
+      return { best: [], worst: null, isSample: false, isUnclassified: false };
+    }
+
+    // 옷장이 비어있으면 샘플 사용
+    if (clothes.length === 0) {
+      const targetLabel = getTempLabel(weather.temp);
+      const matched = SAMPLE_ITEMS
+        .filter(c => c.tempLabel === targetLabel && c.confidence > 0)
+        .sort((a, b) => b.confidence - a.confidence);
+      const unmatched = SAMPLE_ITEMS
+        .filter(c => c.tempLabel && c.tempLabel !== targetLabel && c.confidence > 0)
+        .sort((a, b) => b.confidence - a.confidence);
+      return { best: matched.slice(0, 2), worst: unmatched[0] || null, isSample: true, isUnclassified: false };
+    }
+
+    // 옷장에 옷이 있는 경우
     const targetLabel = getTempLabel(weather.temp);
-    const source = clothes.length > 0 ? clothes : SAMPLE_ITEMS;
-    const isSample = clothes.length === 0;
-    const matched = source
-      .filter(c => c.tempLabel === targetLabel && c.confidence > 0)
+
+    // 1순위: AI 분류된 옷 중 날씨 일치
+    const classified = clothes.filter(c => c.tempLabel && c.confidence > 0);
+    const matched = classified
+      .filter(c => c.tempLabel === targetLabel)
       .sort((a, b) => b.confidence - a.confidence);
-    const unmatched = source
-      .filter(c => c.tempLabel && c.tempLabel !== targetLabel && c.confidence > 0)
+
+    // WORST: AI 분류된 옷 중 날씨 불일치
+    const unmatched = classified
+      .filter(c => c.tempLabel !== targetLabel)
       .sort((a, b) => b.confidence - a.confidence);
-    return { best: matched.slice(0, 2), worst: unmatched[0] || null, isSample };
+
+    if (matched.length > 0) {
+      // AI 분류된 날씨 맞는 옷이 있으면 그걸로 표시
+      return { best: matched.slice(0, 2), worst: unmatched[0] || null, isSample: false, isUnclassified: false };
+    }
+
+    // 2순위: AI 분류 없는 옷들 (사진 없이 추가한 옷)
+    const unclassified = clothes.filter(c => !c.tempLabel || c.confidence === 0);
+    if (unclassified.length > 0) {
+      return { best: unclassified.slice(0, 2), worst: unmatched[0] || null, isSample: false, isUnclassified: true };
+    }
+
+    // 분류된 옷은 있지만 오늘 날씨에 맞는 게 없는 경우
+    return { best: [], worst: unmatched[0] || null, isSample: false, isUnclassified: false };
   };
 
-  const { best, worst, isSample } = getBestWorst();
+  const { best, worst, isSample, isUnclassified } = getBestWorst();
 
   const handleLogin = (nick) => {
     setNickname(nick);
@@ -445,6 +483,13 @@ function App() {
 
   const filteredClothes = filter === '전체' ? clothes : clothes.filter(item => item.category === filter);
 
+  // 안내 메시지 결정
+  const recommendNote = isSample
+    ? '📦 옷장이 비어있어요! 샘플 아이템으로 추천해드릴게요.'
+    : isUnclassified
+      ? '📷 AI 분류 정보가 없는 옷이에요. 사진을 업로드하면 날씨별 정확한 추천을 받을 수 있어요!'
+      : '👚 내 옷장 기반으로 오늘 날씨에 맞는 코디를 추천해드려요!';
+
   return (
     <div style={styles.container}>
       {/* 헤더 */}
@@ -471,31 +516,38 @@ function App() {
         </div>
       </div>
 
-      {/* ✅ 오늘의 추천 코디 — 내 옷장 기반 BEST/WORST (없으면 샘플) */}
+      {/* ✅ 오늘의 추천 코디 — BEST/WORST */}
       <section style={styles.recommendSection}>
         <h2 style={styles.sectionTitle}>✨ 오늘의 추천 코디</h2>
-        {isSample
-          ? <p style={styles.sampleNote}>📦 옷장이 비어있어요! 샘플 아이템으로 추천해드릴게요.</p>
-          : <p style={styles.sampleNote}>👚 내 옷장 기반으로 오늘 날씨에 맞는 코디를 추천해드려요!</p>
-        }
+        <p style={styles.sampleNote}>{recommendNote}</p>
         <div style={styles.bestWorstRow}>
           {best.length > 0 ? best.map((item, idx) => (
             <div key={item.id} style={styles.bestCard}>
-              <div style={styles.bestBadge}>🏆 BEST {idx + 1}{isSample ? ' (샘플)' : ''}</div>
+              <div style={styles.bestBadge}>
+                🏆 BEST {idx + 1}{isSample ? ' (샘플)' : isUnclassified ? ' (미분류)' : ''}
+              </div>
               <RecommendImage item={item} style={styles.recommendImg} />
               <p style={styles.recommendName}>{item.name || item.title}</p>
               <p style={styles.recommendCategory}>{item.category}</p>
-              <div style={styles.confidenceBar}>
-                <div style={{ ...styles.confidenceFill, width: `${item.confidence}%`, backgroundColor: '#4C6EF5' }} />
-              </div>
-              <p style={styles.confidenceText}>AI 확신도 {Number(item.confidence).toFixed(1)}%</p>
-              <span style={styles.tempTagGreen}>🌡 {item.tempLabel}</span>
+              {item.confidence > 0 ? (
+                <>
+                  <div style={styles.confidenceBar}>
+                    <div style={{ ...styles.confidenceFill, width: `${item.confidence}%`, backgroundColor: '#4C6EF5' }} />
+                  </div>
+                  <p style={styles.confidenceText}>AI 확신도 {Number(item.confidence).toFixed(1)}%</p>
+                  <span style={styles.tempTagGreen}>🌡 {item.tempLabel}</span>
+                </>
+              ) : (
+                <p style={{ color: '#94A3B8', fontSize: '0.82rem', marginTop: '8px' }}>
+                  📷 사진 업로드 시 AI 분류 가능
+                </p>
+              )}
             </div>
           )) : (
             <div style={styles.emptyRecommend}>
               <p>😅 오늘 날씨에 맞는 옷이 없어요!</p>
               <p style={{ fontSize: '0.9rem', color: '#94A3B8' }}>
-                {clothes.length > 0 ? '옷에 온도 태그를 추가해보세요.' : '옷을 추가해보세요.'}
+                {clothes.length > 0 ? '사진을 업로드해서 AI 분류를 받아보세요.' : '옷을 추가해보세요.'}
               </p>
             </div>
           )}
@@ -516,7 +568,7 @@ function App() {
         </div>
       </section>
 
-      {/* ✅ 전체 코디 추천 — 항상 샘플 카드 (상의/하의/신발 각각) */}
+      {/* ✅ 전체 코디 추천 — 항상 샘플 카드 */}
       <section style={styles.outfitSection}>
         <h2 style={styles.sectionTitle}>👔 전체 코디 추천</h2>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
@@ -668,8 +720,6 @@ const styles = {
   cardHighlight: { backgroundColor: '#EEF2FF', padding: '30px', borderRadius: '24px', width: '240px', textAlign: 'center', border: '2px solid #4C6EF5', boxShadow: '0 10px 25px -5px rgba(76,110,245,0.1)' },
   cardTitle: { fontSize: '1rem', color: '#475569', margin: '15px 0 5px 0' },
   cardContent: { fontSize: '1.1rem', fontWeight: '700', color: '#1E293B' },
-
-  // 오늘의 추천 BEST/WORST
   recommendSection: { maxWidth: '1100px', margin: '0 auto 60px auto' },
   sectionTitle: { fontSize: '1.5rem', fontWeight: '700', color: '#1E293B', marginBottom: '24px' },
   sampleNote: { color: '#94A3B8', marginBottom: '20px', fontSize: '1rem' },
@@ -688,8 +738,6 @@ const styles = {
   tempTagRed: { backgroundColor: '#FEF2F2', color: '#EF4444', padding: '4px 12px', borderRadius: '10px', fontSize: '0.8rem', fontWeight: '600' },
   worstMsg: { color: '#EF4444', fontSize: '0.85rem', marginTop: '8px', fontWeight: '600' },
   emptyRecommend: { textAlign: 'center', padding: '40px', backgroundColor: 'white', borderRadius: '24px', color: '#64748B', border: '2px dashed #E2E8F0' },
-
-  // 전체 코디 추천 (항상 샘플)
   outfitSection: { maxWidth: '1200px', margin: '0 auto 60px auto' },
   reshuffleSampleBtn: { backgroundColor: 'white', color: '#4C6EF5', border: '2px solid #4C6EF5', padding: '10px 20px', borderRadius: '12px', cursor: 'pointer', fontWeight: '700', fontSize: '0.95rem', whiteSpace: 'nowrap' },
   sampleGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '28px' },
@@ -703,13 +751,9 @@ const styles = {
   sampleItemImg: { width: '100%', aspectRatio: '3/4', objectFit: 'cover', borderRadius: '14px', display: 'block' },
   sampleItemBadge: { position: 'absolute', bottom: '6px', left: '50%', transform: 'translateX(-50%)', backgroundColor: 'rgba(0,0,0,0.55)', color: 'white', padding: '2px 8px', borderRadius: '20px', fontSize: '0.72rem', fontWeight: '600', whiteSpace: 'nowrap' },
   sampleItemName: { fontSize: '0.82rem', color: '#475569', fontWeight: '600', margin: 0, textAlign: 'center' },
-
-  // 공통
   tagGroup: { display: 'flex', justifyContent: 'center', gap: '8px', flexWrap: 'wrap' },
   tag: { backgroundColor: '#F1F5F9', padding: '6px 12px', borderRadius: '10px', fontSize: '0.85rem', color: '#64748B', fontWeight: '500' },
   tempTag: { backgroundColor: '#ECFDF5', color: '#059669', padding: '6px 12px', borderRadius: '10px', fontSize: '0.85rem', fontWeight: '600' },
-
-  // 내 옷장
   main: { maxWidth: '1100px', margin: '0 auto' },
   closetHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' },
   addBtn: { backgroundColor: '#4C6EF5', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '14px', cursor: 'pointer', fontWeight: '600', fontSize: '1rem' },
