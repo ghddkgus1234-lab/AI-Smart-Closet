@@ -462,45 +462,71 @@ function App() {
     setAiResult(null);
   };
   const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPreviewUrl(reader.result);
-      setNewItem(prev => ({ ...prev, imageUrl: reader.result }));
-    };
-    reader.readAsDataURL(file);
-    const categoryToEndpoint = { '상의': 'top', '하의': 'bottoms', '아우터': 'outer' };
-    const endpoint = categoryToEndpoint[newItem.category];
-    if (!endpoint) return;
-    setAiLoading(true);
-    setAiResult(null);
-    const toBase64 = (f) => new Promise((resolve) => {
-      const r = new FileReader();
-      r.onloadend = () => resolve(r.result);
-      r.readAsDataURL(f);
-    });
-    try {
-      const base64Image = await toBase64(file);
-      const res = await fetch('https://jangso-smart-closet-ai.hf.space/run/predict', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: [base64Image, newItem.category] }),
-      });
-      if (!res.ok) throw new Error('서버 오류');
-      const json = await res.json();
-      const labelStr = json.data[0];
-      const allProbs = json.data[1] || {};
-      const label = labelStr.split(' (')[0];
-      const confidence = parseFloat(labelStr.match(/\((.+)%\)/)?.[1] || '0');
-      setAiResult({ label, confidence, all_probs: allProbs });
-      setNewItem(prev => ({ ...prev, tempLabel: label, confidence }));
-    } catch {
-      setAiResult({ error: 'AI 서버에 연결할 수 없습니다.' });
-    } finally {
-      setAiLoading(false);
-    }
+  const file = e.target.files[0];
+  if (!file) return;
+
+  // 미리보기
+  const reader = new FileReader();
+  reader.onloadend = () => {
+    setPreviewUrl(reader.result);
+    setNewItem(prev => ({ ...prev, imageUrl: reader.result }));
   };
+  reader.readAsDataURL(file);
+
+  const categoryToEndpoint = { '상의': 'top', '하의': 'bottoms', '아우터': 'outer' };
+  const endpoint = categoryToEndpoint[newItem.category];
+  if (!endpoint) return;
+
+  setAiLoading(true);
+  setAiResult(null);
+
+  try {
+    // FormData로 파일 직접 업로드
+    const formData = new FormData();
+    formData.append('files', file);
+
+    // 1단계: 파일 업로드
+    const uploadRes = await fetch('https://jangso-smart-closet-ai.hf.space/gradio_api/upload', {
+      method: 'POST',
+      body: formData,
+    });
+    if (!uploadRes.ok) throw new Error('업로드 실패');
+    const uploadedPaths = await uploadRes.json();
+    const filePath = uploadedPaths[0];
+
+    // 2단계: 예측 요청
+    const res = await fetch('https://jangso-smart-closet-ai.hf.space/gradio_api/call/gradio_predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: [{ path: filePath }, newItem.category]
+      }),
+    });
+    if (!res.ok) throw new Error('서버 오류');
+    const { event_id } = await res.json();
+
+    // 3단계: 결과 가져오기
+    const resultRes = await fetch(
+      `https://jangso-smart-closet-ai.hf.space/gradio_api/call/gradio_predict/${event_id}`
+    );
+    const text = await resultRes.text();
+    const dataLine = text.split('\n').find(line => line.startsWith('data:'));
+    const json = JSON.parse(dataLine.replace('data: ', ''));
+    const labelStr = json[0];
+    console.log('labelStr:', labelStr);  // ← 이거 추가
+    console.log('json:', json);
+    const allProbs = json[1] || {};
+    const label = labelStr.replace(/\s+\(\d+\.?\d*%\)$/, '');
+    const confidence = parseFloat(labelStr.match(/\((\d+\.?\d*)%\)/)?.[1] || '0');
+
+    setAiResult({ label, confidence, all_probs: allProbs });
+    setNewItem(prev => ({ ...prev, tempLabel: label, confidence }));
+  } catch (err) {
+    setAiResult({ error: 'AI 서버에 연결할 수 없습니다.' });
+  } finally {
+    setAiLoading(false);
+  }
+};
   const handleAddClothes = () => {
     if (!newItem.name) return alert('이름을 입력해주세요!');
     setClothes(prev => [...prev, { ...newItem, id: Date.now() }]);
