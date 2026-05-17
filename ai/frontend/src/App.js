@@ -3,7 +3,7 @@ import AuthPage from './AuthPage';
 
 const GEMINI_API_KEY = 'AIzaSyBI_A-SOy-AHi_pkkBSePfjYyGIZofMl1s';
 
-// ✅ 샘플 코디 카드용 (상의/하의/신발 각각 이미지)
+// ✅ 전체 코디 추천 카드용 (항상 샘플로 표시)
 const SAMPLE_OUTFITS = [
   {
     id: 1,
@@ -112,7 +112,7 @@ const SAMPLE_OUTFITS = [
   },
 ];
 
-// ✅ BEST/WORST 추천용 샘플 아이템 (images 배열 + fallback 지원)
+// ✅ 오늘의 추천 코디 BEST/WORST용 샘플 (옷장이 비었을 때만 사용)
 const SAMPLE_ITEMS = [
   { id: 's1', title: '크롭 반팔티',   category: '상의',   images: ['https://images.unsplash.com/photo-1562157873-818bc0726f68?w=400&q=80',  'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&q=80'], tempLabel: '더움(25°C~)',    confidence: 92.3 },
   { id: 's2', title: '린넨 블라우스', category: '상의',   images: ['https://images.unsplash.com/photo-1560243563-062bfc001d68?w=400&q=80',  'https://images.unsplash.com/photo-1617019114583-affb34d1b3cd?w=400&q=80'], tempLabel: '따뜻(16~24°C)', confidence: 88.7 },
@@ -156,18 +156,15 @@ function getTempLabel(temp) {
   return '추움(~8°C)';
 }
 
-// ✅ BEST/WORST 카드용 이미지 컴포넌트 (순서대로 fallback 시도)
+// ✅ BEST/WORST 카드 이미지 — 순서대로 fallback 시도
 function RecommendImage({ item, style }) {
-  const images = item.images || (item.imageUrl ? [item.imageUrl] : [item.image].filter(Boolean));
+  const images = item.images || (item.imageUrl ? [item.imageUrl] : []);
   const [idx, setIdx] = useState(0);
   const [failed, setFailed] = useState(false);
 
   const handleError = () => {
-    if (idx + 1 < images.length) {
-      setIdx(prev => prev + 1);
-    } else {
-      setFailed(true);
-    }
+    if (idx + 1 < images.length) setIdx(prev => prev + 1);
+    else setFailed(true);
   };
 
   if (failed || images.length === 0) {
@@ -308,13 +305,12 @@ function App() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newItem, setNewItem] = useState({ name: '', category: '상의', color: '', imageUrl: '', tempLabel: '', confidence: 0 });
   const [previewUrl, setPreviewUrl] = useState('');
-  const [recommendation, setRecommendation] = useState(null);
   const [weather, setWeather] = useState(null);
   const [weatherLoading, setWeatherLoading] = useState(true);
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
 
-  // 샘플 코디 카드 이미지 상태
+  // ✅ 전체 코디 추천 카드 이미지 상태 (항상 샘플 유지)
   const [sampleImages, setSampleImages] = useState(() => {
     const init = {};
     SAMPLE_OUTFITS.forEach(outfit => {
@@ -362,22 +358,9 @@ function App() {
     localStorage.setItem('closet_clothes', JSON.stringify(clothes));
   }, [clothes]);
 
-  useEffect(() => {
-    if (clothes.length > 0) {
-      const tops = clothes.filter(c => c.category === '상의');
-      const bottoms = clothes.filter(c => c.category === '하의');
-      const outers = clothes.filter(c => c.category === '아우터');
-      setRecommendation({
-        top: tops[Math.floor(Math.random() * tops.length)],
-        bottom: bottoms[Math.floor(Math.random() * bottoms.length)],
-        outer: outers[Math.floor(Math.random() * outers.length)],
-      });
-    } else {
-      setRecommendation(null);
-    }
-  }, [clothes]);
-
   // ✅ BEST 2 / WORST 1 계산
+  // 옷장에 옷이 있으면 → 내 옷장 기반
+  // 옷장이 비어있으면 → SAMPLE_ITEMS 기반
   const getBestWorst = () => {
     if (!weather || weather.temp === '--') return { best: [], worst: null, isSample: false };
     const targetLabel = getTempLabel(weather.temp);
@@ -457,16 +440,6 @@ function App() {
     setShowAddModal(false);
   };
   const handleDelete = (id) => setClothes(prev => prev.filter(c => c.id !== id));
-  const reshuffleRecommendation = () => {
-    const tops = clothes.filter(c => c.category === '상의');
-    const bottoms = clothes.filter(c => c.category === '하의');
-    const outers = clothes.filter(c => c.category === '아우터');
-    setRecommendation({
-      top: tops[Math.floor(Math.random() * tops.length)],
-      bottom: bottoms[Math.floor(Math.random() * bottoms.length)],
-      outer: outers[Math.floor(Math.random() * outers.length)],
-    });
-  };
 
   if (!token) return <AuthPage onLogin={handleLogin} />;
 
@@ -498,17 +471,17 @@ function App() {
         </div>
       </div>
 
-      {/* ✅ BEST 2 / WORST 1 섹션 */}
+      {/* ✅ 오늘의 추천 코디 — 내 옷장 기반 BEST/WORST (없으면 샘플) */}
       <section style={styles.recommendSection}>
         <h2 style={styles.sectionTitle}>✨ 오늘의 추천 코디</h2>
-        {isSample && (
-          <p style={styles.sampleNote}>📦 옷장이 비어있어요! 샘플 아이템으로 추천해드릴게요.</p>
-        )}
+        {isSample
+          ? <p style={styles.sampleNote}>📦 옷장이 비어있어요! 샘플 아이템으로 추천해드릴게요.</p>
+          : <p style={styles.sampleNote}>👚 내 옷장 기반으로 오늘 날씨에 맞는 코디를 추천해드려요!</p>
+        }
         <div style={styles.bestWorstRow}>
           {best.length > 0 ? best.map((item, idx) => (
             <div key={item.id} style={styles.bestCard}>
               <div style={styles.bestBadge}>🏆 BEST {idx + 1}{isSample ? ' (샘플)' : ''}</div>
-              {/* ✅ RecommendImage: images 배열 순서대로 fallback 시도 */}
               <RecommendImage item={item} style={styles.recommendImg} />
               <p style={styles.recommendName}>{item.name || item.title}</p>
               <p style={styles.recommendCategory}>{item.category}</p>
@@ -521,13 +494,14 @@ function App() {
           )) : (
             <div style={styles.emptyRecommend}>
               <p>😅 오늘 날씨에 맞는 옷이 없어요!</p>
-              <p style={{ fontSize: '0.9rem', color: '#94A3B8' }}>옷을 더 추가해보세요.</p>
+              <p style={{ fontSize: '0.9rem', color: '#94A3B8' }}>
+                {clothes.length > 0 ? '옷에 온도 태그를 추가해보세요.' : '옷을 추가해보세요.'}
+              </p>
             </div>
           )}
           {worst && (
             <div style={styles.worstCard}>
               <div style={styles.worstBadge}>❌ WORST{isSample ? ' (샘플)' : ''}</div>
-              {/* ✅ RecommendImage: images 배열 순서대로 fallback 시도 */}
               <RecommendImage item={worst} style={styles.recommendImg} />
               <p style={styles.recommendName}>{worst.name || worst.title}</p>
               <p style={styles.recommendCategory}>{worst.category}</p>
@@ -542,85 +516,47 @@ function App() {
         </div>
       </section>
 
-      {/* ✅ 전체 코디 섹션 */}
+      {/* ✅ 전체 코디 추천 — 항상 샘플 카드 (상의/하의/신발 각각) */}
       <section style={styles.outfitSection}>
         <h2 style={styles.sectionTitle}>👔 전체 코디 추천</h2>
-        {clothes.length > 0 ? (
-          <div style={styles.myOutfitCard}>
-            <p style={styles.myOutfitLabel}>👚 내 옷장에서 추천</p>
-            <div style={styles.outfitRow}>
-              {recommendation?.top && (
-                <div style={styles.outfitItem}>
-                  <img src={recommendation.top.imageUrl} alt={recommendation.top.name} style={styles.outfitImg} />
-                  <span style={styles.outfitItemLabel}>{recommendation.top.name}</span>
-                  <span style={styles.outfitTag}>상의</span>
-                  {recommendation.top.tempLabel && <span style={styles.outfitTempTag}>{recommendation.top.tempLabel}</span>}
-                </div>
-              )}
-              {recommendation?.bottom && (
-                <div style={styles.outfitItem}>
-                  <img src={recommendation.bottom.imageUrl} alt={recommendation.bottom.name} style={styles.outfitImg} />
-                  <span style={styles.outfitItemLabel}>{recommendation.bottom.name}</span>
-                  <span style={styles.outfitTag}>하의</span>
-                  {recommendation.bottom.tempLabel && <span style={styles.outfitTempTag}>{recommendation.bottom.tempLabel}</span>}
-                </div>
-              )}
-              {recommendation?.outer && (
-                <div style={styles.outfitItem}>
-                  <img src={recommendation.outer.imageUrl} alt={recommendation.outer.name} style={styles.outfitImg} />
-                  <span style={styles.outfitItemLabel}>{recommendation.outer.name}</span>
-                  <span style={styles.outfitTag}>아우터</span>
-                  {recommendation.outer.tempLabel && <span style={styles.outfitTempTag}>{recommendation.outer.tempLabel}</span>}
-                </div>
-              )}
-              {!recommendation?.top && !recommendation?.bottom && !recommendation?.outer && (
-                <p style={{ color: '#94A3B8' }}>상의/하의/아우터를 더 추가하면 코디를 추천해드려요!</p>
-              )}
-            </div>
-            <button onClick={reshuffleRecommendation} style={styles.reshuffleBtn}>🔀 다시 추천받기</button>
-          </div>
-        ) : (
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
-              <p style={{ color: '#94A3B8', fontSize: '1rem', margin: 0 }}>📦 샘플 코디로 전체 코디를 확인해보세요.</p>
-              <button onClick={reshuffleSampleImages} style={styles.reshuffleSampleBtn}>🔀 이미지 바꾸기</button>
-            </div>
-            <div style={styles.sampleGrid}>
-              {SAMPLE_OUTFITS.map(outfit => (
-                <div key={outfit.id} style={styles.sampleCard}>
-                  <div style={styles.sampleCardHeader}>
-                    <h3 style={styles.sampleTitle}>{outfit.title}</h3>
-                    <span style={styles.sampleWeatherBadge}>🌡 {outfit.weather}</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+          <p style={{ color: '#94A3B8', fontSize: '1rem', margin: 0 }}>오늘 입기 좋은 스타일을 참고해보세요.</p>
+          <button onClick={reshuffleSampleImages} style={styles.reshuffleSampleBtn}>🔀 이미지 바꾸기</button>
+        </div>
+        <div style={styles.sampleGrid}>
+          {SAMPLE_OUTFITS.map(outfit => (
+            <div key={outfit.id} style={styles.sampleCard}>
+              <div style={styles.sampleCardHeader}>
+                <h3 style={styles.sampleTitle}>{outfit.title}</h3>
+                <span style={styles.sampleWeatherBadge}>🌡 {outfit.weather}</span>
+              </div>
+              <div style={styles.sampleItemRow}>
+                {outfit.items.map((item, idx) => (
+                  <div key={idx} style={styles.sampleItemCol}>
+                    <div style={styles.sampleImgWrap}>
+                      <img
+                        src={sampleImages[outfit.id]?.[idx]}
+                        alt={item.name}
+                        style={styles.sampleItemImg}
+                        onError={e => {
+                          const fallbacks = item.images.filter(img => img !== e.target.src);
+                          if (fallbacks.length > 0) e.target.src = fallbacks[0];
+                        }}
+                      />
+                      <span style={styles.sampleItemBadge}>
+                        {labelEmoji[item.label]} {item.label}
+                      </span>
+                    </div>
+                    <p style={styles.sampleItemName}>{item.name}</p>
                   </div>
-                  <div style={styles.sampleItemRow}>
-                    {outfit.items.map((item, idx) => (
-                      <div key={idx} style={styles.sampleItemCol}>
-                        <div style={styles.sampleImgWrap}>
-                          <img
-                            src={sampleImages[outfit.id]?.[idx]}
-                            alt={item.name}
-                            style={styles.sampleItemImg}
-                            onError={e => {
-                              const fallbacks = item.images.filter(img => img !== e.target.src);
-                              if (fallbacks.length > 0) e.target.src = fallbacks[0];
-                            }}
-                          />
-                          <span style={styles.sampleItemBadge}>
-                            {labelEmoji[item.label]} {item.label}
-                          </span>
-                        </div>
-                        <p style={styles.sampleItemName}>{item.name}</p>
-                      </div>
-                    ))}
-                  </div>
-                  <div style={styles.tagGroup}>
-                    {outfit.tags.map(tag => <span key={tag} style={styles.tag}>{tag}</span>)}
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
+              <div style={styles.tagGroup}>
+                {outfit.tags.map(tag => <span key={tag} style={styles.tag}>{tag}</span>)}
+              </div>
             </div>
-          </div>
-        )}
+          ))}
+        </div>
       </section>
 
       {/* 내 옷장 */}
@@ -733,7 +669,7 @@ const styles = {
   cardTitle: { fontSize: '1rem', color: '#475569', margin: '15px 0 5px 0' },
   cardContent: { fontSize: '1.1rem', fontWeight: '700', color: '#1E293B' },
 
-  // BEST/WORST
+  // 오늘의 추천 BEST/WORST
   recommendSection: { maxWidth: '1100px', margin: '0 auto 60px auto' },
   sectionTitle: { fontSize: '1.5rem', fontWeight: '700', color: '#1E293B', marginBottom: '24px' },
   sampleNote: { color: '#94A3B8', marginBottom: '20px', fontSize: '1rem' },
@@ -753,20 +689,9 @@ const styles = {
   worstMsg: { color: '#EF4444', fontSize: '0.85rem', marginTop: '8px', fontWeight: '600' },
   emptyRecommend: { textAlign: 'center', padding: '40px', backgroundColor: 'white', borderRadius: '24px', color: '#64748B', border: '2px dashed #E2E8F0' },
 
-  // 전체 코디 섹션
+  // 전체 코디 추천 (항상 샘플)
   outfitSection: { maxWidth: '1200px', margin: '0 auto 60px auto' },
-  myOutfitCard: { backgroundColor: '#EEF2FF', borderRadius: '24px', padding: '30px', border: '2px solid #4C6EF5' },
-  myOutfitLabel: { color: '#4C6EF5', fontWeight: '700', marginBottom: '20px', fontSize: '1rem' },
-  outfitRow: { display: 'flex', gap: '20px', flexWrap: 'wrap', marginBottom: '20px' },
-  outfitItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' },
-  outfitImg: { width: '120px', height: '140px', objectFit: 'cover', borderRadius: '16px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' },
-  outfitItemLabel: { fontSize: '0.9rem', fontWeight: '600', color: '#1E293B' },
-  outfitTag: { backgroundColor: '#4C6EF5', color: 'white', padding: '4px 10px', borderRadius: '8px', fontSize: '0.75rem' },
-  outfitTempTag: { backgroundColor: '#ECFDF5', color: '#059669', padding: '4px 10px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '600' },
-  reshuffleBtn: { backgroundColor: '#4C6EF5', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '12px', cursor: 'pointer', fontWeight: '600', fontSize: '1rem' },
   reshuffleSampleBtn: { backgroundColor: 'white', color: '#4C6EF5', border: '2px solid #4C6EF5', padding: '10px 20px', borderRadius: '12px', cursor: 'pointer', fontWeight: '700', fontSize: '0.95rem', whiteSpace: 'nowrap' },
-
-  // 샘플 코디 카드
   sampleGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '28px' },
   sampleCard: { backgroundColor: 'white', borderRadius: '24px', padding: '24px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', gap: '16px' },
   sampleCardHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
@@ -797,8 +722,6 @@ const styles = {
   clothesName: { fontSize: '1.1rem', color: '#1E293B', marginBottom: '12px' },
   deleteBtn: { backgroundColor: '#FEE2E2', color: '#EF4444', border: 'none', padding: '8px 16px', borderRadius: '10px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' },
   emptyState: { gridColumn: '1 / -1', textAlign: 'center', padding: '80px 20px', backgroundColor: '#FFFFFF', borderRadius: '32px', border: '2px dashed #E2E8F0', color: '#94A3B8' },
-
-  // 모달
   modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
   modal: { backgroundColor: 'white', borderRadius: '24px', padding: '40px', width: '90%', maxWidth: '480px', boxShadow: '0 25px 50px rgba(0,0,0,0.15)', maxHeight: '90vh', overflowY: 'auto' },
   input: { width: '100%', padding: '14px', borderRadius: '12px', border: '1px solid #E2E8F0', fontSize: '1rem', marginBottom: '16px', boxSizing: 'border-box', outline: 'none' },
