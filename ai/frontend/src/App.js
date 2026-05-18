@@ -14,11 +14,11 @@ const SAMPLE_OUTFITS = [
     items: [
       {
         label: '상의',
-        name: '화이트 티셔츠',
+        name: '티셔츠',
         images: [
           'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=300&q=80',
-          'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=300&q=80',
           'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?w=300&q=80',
+          'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=300&q=80',
         ],
       },
       {
@@ -26,13 +26,13 @@ const SAMPLE_OUTFITS = [
         name: '청바지',
         images: [
           'https://images.unsplash.com/photo-1542272604-787c3835535d?w=300&q=80',
-          'https://images.unsplash.com/photo-1604176354204-9268737828e4?w=300&q=80',
           'https://images.unsplash.com/photo-1475178626620-a4d074967452?w=300&q=80',
+          'https://images.unsplash.com/photo-1604176354204-9268737828e4?w=300&q=80',
         ],
       },
       {
         label: '신발',
-        name: '스니커즈',
+        name: '운동화',
         images: [
           'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=300&q=80',
           'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=300&q=80',
@@ -51,9 +51,9 @@ const SAMPLE_OUTFITS = [
         label: '상의',
         name: '블라우스',
         images: [
-          'https://images.unsplash.com/photo-1594938298603-c8148c4b4e51?w=300&q=80',
-          'https://images.unsplash.com/photo-1560243563-062bfc001d68?w=300&q=80',
-          'https://images.unsplash.com/photo-1617019114583-affb34d1b3cd?w=300&q=80',
+          'https://images.unsplash.com/photo-1598554747436-c9293d6a588f?w=300&q=80',
+          'https://images.unsplash.com/photo-1590588503756-08a4b2be5eb9?q=80&w=735&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+          'https://images.unsplash.com/photo-1770294758906-c8762abb2c8b?q=80&w=1074&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
         ],
       },
       {
@@ -61,17 +61,17 @@ const SAMPLE_OUTFITS = [
         name: '슬랙스',
         images: [
           'https://images.unsplash.com/photo-1506629082955-511b1aa562c8?w=300&q=80',
-          'https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=300&q=80',
-          'https://images.unsplash.com/photo-1559563458-527698bf5295?w=300&q=80',
+          'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=300&q=80',
+          'https://images.unsplash.com/photo-1694447814836-c93ab70f7398?q=80&w=764&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
         ],
       },
       {
         label: '신발',
         name: '플랫슈즈',
         images: [
-          'https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=300&q=80',
+          'https://images.unsplash.com/photo-1712512343634-f64161d3daa6?q=80&w=1587&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
           'https://images.unsplash.com/photo-1515347619252-60a4bf4fff4f?w=300&q=80',
-          'https://images.unsplash.com/photo-1555274175-6cbf6f3b137b?w=300&q=80',
+          'https://images.unsplash.com/photo-1775297832774-9eb647970c68?q=80&w=1169&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
         ],
       },
     ],
@@ -86,9 +86,9 @@ const SAMPLE_OUTFITS = [
         label: '아우터',
         name: '후드티',
         images: [
-          'https://images.unsplash.com/photo-1556821840-3a63f15732ce?w=300&q=80',
-          'https://images.unsplash.com/photo-1509631179647-0177331693ae?w=300&q=80',
-          'https://images.unsplash.com/photo-1503342394128-c104d54dba01?w=300&q=80',
+          'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=400&q=80',
+          'https://images.unsplash.com/photo-1680292783974-a9a336c10366?q=80&w=694&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+          'https://images.unsplash.com/photo-1513789181297-6f2ec112c0bc?q=80&w=1588&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
         ],
       },
       {
@@ -96,16 +96,16 @@ const SAMPLE_OUTFITS = [
         name: '조거팬츠',
         images: [
           'https://images.unsplash.com/photo-1552902865-b72c031ac5ea?w=300&q=80',
-          'https://images.unsplash.com/photo-1598033129183-c4f50c736f10?w=300&q=80',
-          'https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=300&q=80',
+          'https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=400&q=80',
+          'https://images.unsplash.com/photo-1706177208693-2e3c68e5f0f2?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
         ],
       },
       {
         label: '신발',
         name: '운동화',
         images: [
-          'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=300&q=80',
           'https://images.unsplash.com/photo-1491553895911-0055eca6402d?w=300&q=80',
+          'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=300&q=80',
           'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=300&q=80',
         ],
       },
@@ -116,16 +116,16 @@ const SAMPLE_OUTFITS = [
 // ✅ 오늘의 추천 코디 BEST/WORST용 샘플 (옷장이 비었을 때만 사용)
 const SAMPLE_ITEMS = [
   { id: 's1', title: '크롭 반팔티',   category: '상의',   images: [
-    'https://images.unsplash.com/photo-1562157873-818bc0726f68?w=400&q=80',
+    'https://images.unsplash.com/photo-1503342394128-c104d54dba01?w=400&q=80',
     'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=400&q=80',
   ], tempLabel: '더움(25°C~)',    confidence: 92.3 },
   
-  { id: 's2', title: '린넨 블라우스', category: '상의',   images: [
+  { id: 's2', title: '블라우스', category: '상의',   images: [
     'https://images.unsplash.com/photo-1551163943-3f7fb896e0f4?w=400&q=80',  // 블라우스
-    'https://images.unsplash.com/photo-1598554747436-c9293d6a588f?w=400&q=80', // 여성 상의
+    'https://images.unsplash.com/photo-1590588503756-08a4b2be5eb9?q=80&w=735&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D', // 여성 상의
   ], tempLabel: '따뜻(16~24°C)', confidence: 88.7 },
   
-  { id: 's3', title: '오버핏 후드티', category: '상의', images: [
+  { id: 's3', title: '후드티', category: '상의', images: [
   'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=400&q=80',
 ], tempLabel: '쌀쌀(9~15°C)', confidence: 85.1 },
   
@@ -139,13 +139,13 @@ const SAMPLE_ITEMS = [
     'https://images.unsplash.com/photo-1571945153237-4929e783af4a?w=400&q=80',
   ], tempLabel: '따뜻(16~24°C)', confidence: 87.2 },
   
-  { id: 's6', title: '슬림 슬랙스',   category: '하의',   images: [
-    'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400&q=80',
+  { id: 's6', title: '슬랙스',   category: '하의',   images: [
+    'https://images.unsplash.com/photo-1694447814836-c93ab70f7398?q=80&w=764&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
     'https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=400&q=80',
   ], tempLabel: '쌀쌀(9~15°C)',  confidence: 83.4 },
   
-  { id: 's7', title: '린넨 가디건',   category: '아우터', images: [
-    'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=400&q=80',
+  { id: 's7', title: '가디건',   category: '아우터', images: [
+    'https://images.unsplash.com/photo-1758981400268-1181291b9503?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
     'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=400&q=80',
   ], tempLabel: '따뜻(16~24°C)', confidence: 89.1 },
   
