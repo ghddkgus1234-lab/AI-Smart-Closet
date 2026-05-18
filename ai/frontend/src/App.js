@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import AuthPage from './AuthPage';
+import { getClothes, addCloth, deleteCloth } from './api';
 
 const GEMINI_API_KEY = 'AIzaSyBI_A-SOy-AHi_pkkBSePfjYyGIZofMl1s';
 
@@ -332,12 +333,8 @@ const chatStyles = {
 function App() {
   const [nickname, setNickname] = useState(localStorage.getItem('nickname') || '');
   const [token, setToken] = useState(localStorage.getItem('token') || '');
-  const [clothes, setClothes] = useState(() => {
-    try {
-      const saved = localStorage.getItem('closet_clothes');
-      return saved ? JSON.parse(saved) : [];
-    } catch { return []; }
-  });
+  const [clothes, setClothes] = useState([]);
+  const [clothesLoading, setClothesLoading] = useState(true);
   const [filter, setFilter] = useState('전체');
   const [showAddModal, setShowAddModal] = useState(false);
   const [newItem, setNewItem] = useState({ name: '', category: '상의', color: '', imageUrl: '', tempLabel: '', confidence: 0 });
@@ -391,9 +388,16 @@ function App() {
       });
   }, []);
 
+  // DB에서 옷 불러오기
   useEffect(() => {
-    localStorage.setItem('closet_clothes', JSON.stringify(clothes));
-  }, [clothes]);
+    if (!token) return;
+    setClothesLoading(true);
+    getClothes()
+      .then(data => {
+        if (Array.isArray(data)) setClothes(data);
+      })
+      .finally(() => setClothesLoading(false));
+  }, [token]);
 
   // ✅ BEST/WORST 계산 — 3단계 우선순위로 처리
   // 1순위: tempLabel 일치 + confidence > 0 (AI 분류된 옷)
@@ -468,9 +472,9 @@ function App() {
   // 미리보기
   const reader = new FileReader();
   reader.onloadend = () => {
-    setPreviewUrl(reader.result);
-    setNewItem(prev => ({ ...prev, imageUrl: reader.result }));
-  };
+  setPreviewUrl(reader.result);
+  setNewItem(prev => ({ ...prev, imageUrl: reader.result, file: file })); // file 추가
+};
   reader.readAsDataURL(file);
 
   const categoryToEndpoint = { '상의': 'top', '하의': 'bottoms', '아우터': 'outer' };
@@ -527,15 +531,54 @@ function App() {
     setAiLoading(false);
   }
 };
-  const handleAddClothes = () => {
-    if (!newItem.name) return alert('이름을 입력해주세요!');
-    setClothes(prev => [...prev, { ...newItem, id: Date.now() }]);
-    setNewItem({ name: '', category: '상의', color: '', imageUrl: '', tempLabel: '', confidence: 0 });
-    setPreviewUrl('');
-    setAiResult(null);
-    setShowAddModal(false);
-  };
-  const handleDelete = (id) => setClothes(prev => prev.filter(c => c.id !== id));
+const handleAddClothes = async () => {
+  if (!newItem.name) return alert('이름을 입력해주세요!');
+
+  try {
+    const formData = new FormData();
+    formData.append('category', newItem.category);
+    formData.append('color', newItem.color || '기타');
+    formData.append('styleTags', JSON.stringify([]));
+    formData.append('memo', '');
+
+    // 이미지 파일이 있으면 추가
+    if (newItem.file) {
+      formData.append('image', newItem.file);
+    } else if (newItem.imageUrl) {
+      // base64를 blob으로 변환
+      const res = await fetch(newItem.imageUrl);
+      const blob = await res.blob();
+      formData.append('image', blob, `${newItem.name}.jpg`);
+    }
+
+    const saved = await addCloth(formData);
+    // DB에서 저장된 데이터에 name, tempLabel, confidence 추가
+    setClothes(prev => [...prev, {
+      ...saved,
+      name: newItem.name,
+      tempLabel: newItem.tempLabel,
+      confidence: newItem.confidence,
+      imageUrl: saved.image_url || newItem.imageUrl,
+    }]);
+  } catch (err) {
+    alert('옷 저장에 실패했어요: ' + err.message);
+    return;
+  }
+
+  setNewItem({ name: '', category: '상의', color: '', imageUrl: '', tempLabel: '', confidence: 0 });
+  setPreviewUrl('');
+  setAiResult(null);
+  setShowAddModal(false);
+};
+
+const handleDelete = async (id) => {
+  try {
+    await deleteCloth(id);
+    setClothes(prev => prev.filter(c => c.id !== id));
+  } catch (err) {
+    alert('삭제에 실패했어요: ' + err.message);
+  }
+};
 
   if (!token) return <AuthPage onLogin={handleLogin} />;
 
