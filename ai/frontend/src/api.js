@@ -4,22 +4,22 @@ function getToken() {
   return localStorage.getItem('token');
 }
 
-export async function login(email, password) {
+export async function login(username, password) {
   const res = await fetch(`${BASE}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ username, password }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message);
   return data;
 }
 
-export async function register(email, password, nickname) {
+export async function register(username, password, nickname) {
   const res = await fetch(`${BASE}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, nickname }),
+    body: JSON.stringify({ username, password, nickname }),
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.message);

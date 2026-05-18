@@ -331,8 +331,8 @@ const chatStyles = {
 
 
 function App() {
-  const [nickname, setNickname] = useState(localStorage.getItem('nickname') || '');
-  const [token, setToken] = useState(localStorage.getItem('token') || '');
+  const [nickname, setNickname] = useState(localStorage.getItem('nickname') || sessionStorage.getItem('nickname') || '');
+  const [token, setToken] = useState(localStorage.getItem('token') || sessionStorage.getItem('token') || '');
   const [clothes, setClothes] = useState([]);
   const [clothesLoading, setClothesLoading] = useState(true);
   const [filter, setFilter] = useState('전체');
@@ -451,13 +451,19 @@ function App() {
 
   const { best, worst, isSample, isUnclassified } = getBestWorst();
 
-  const handleLogin = (nick) => {
+  const handleLogin = (nick, keepLogin) => {
     setNickname(nick);
-    setToken(localStorage.getItem('token'));
+    setToken(keepLogin
+      ? localStorage.getItem('token')
+      : sessionStorage.getItem('token')
+    );
   };
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('nickname');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('nickname');
     setToken('');
     setNickname('');
   };
