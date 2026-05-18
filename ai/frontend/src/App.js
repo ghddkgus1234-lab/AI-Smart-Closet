@@ -334,7 +334,7 @@ function App() {
   const [nickname, setNickname] = useState(localStorage.getItem('nickname') || sessionStorage.getItem('nickname') || '');
   const [token, setToken] = useState(localStorage.getItem('token') || sessionStorage.getItem('token') || '');
   const [clothes, setClothes] = useState([]);
-  const [clothesLoading, setClothesLoading] = useState(true);
+  const [clothesLoading, setClothesLoading] = useState(true); // eslint-disable-line no-unused-vars
   const [filter, setFilter] = useState('전체');
   const [showAddModal, setShowAddModal] = useState(false);
   const [newItem, setNewItem] = useState({ name: '', category: '상의', color: '', imageUrl: '', tempLabel: '', confidence: 0 });
