@@ -10,29 +10,20 @@ router.post('/', auth, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: '이미지를 업로드해주세요' });
 
-    let category = req.body.category || '상의';
-    let color    = req.body.color    || '기타';
-
-    try {
-      const form = new FormData();
-      form.append('file', req.file.path);
-      const aiRes = await axios.post(`${process.env.FASTAPI_URL}/analyze/`, form, {
-        headers: form.getHeaders(),
-        timeout: 10000,
-      });
-      category = aiRes.data.category;
-      color    = aiRes.data.color;
-    } catch {
-      console.warn('AI 서버 연결 실패 — 수동 입력값 사용');
-    }
-
-    const styleTags = req.body.styleTags ? JSON.parse(req.body.styleTags) : [];
-    const memo      = req.body.memo || '';
-    const imageUrl  = req.file.path; // Cloudinary URL
+    const category   = req.body.category   || '상의';
+    const color      = req.body.color      || '기타';
+    const name       = req.body.name       || '';
+    const tempLabel  = req.body.tempLabel  || '';
+    const confidence = parseFloat(req.body.confidence) || 0;
+    const styleTags  = req.body.styleTags ? JSON.parse(req.body.styleTags) : [];
+    const memo       = req.body.memo || '';
+    const imageUrl   = req.file.path;
 
     const result = await pool.query(
-      'INSERT INTO clothes (user_id, image_url, category, color, style_tags, memo) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [req.userId, imageUrl, category, color, JSON.stringify(styleTags), memo]
+      `INSERT INTO clothes 
+        (user_id, image_url, category, color, style_tags, memo, name, temp_label, confidence)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+      [req.userId, imageUrl, category, color, JSON.stringify(styleTags), memo, name, tempLabel, confidence]
     );
 
     res.status(201).json(result.rows[0]);

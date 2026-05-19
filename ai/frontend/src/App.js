@@ -390,14 +390,20 @@ function App() {
 
   // DB에서 옷 불러오기
   useEffect(() => {
-    if (!token) return;
-    setClothesLoading(true);
-    getClothes()
-      .then(data => {
-        if (Array.isArray(data)) setClothes(data);
-      })
-      .finally(() => setClothesLoading(false));
-  }, [token]);
+  if (!token) return;
+  setClothesLoading(true);
+  getClothes()
+    .then(data => {
+      if (Array.isArray(data)) setClothes(data.map(item => ({
+        ...item,
+        name: item.name || '',
+        tempLabel: item.temp_label || '',
+        imageUrl: item.image_url || '',
+        confidence: item.confidence || 0,
+      })));
+    })
+    .finally(() => setClothesLoading(false));
+}, [token]);
 
   // ✅ BEST/WORST 계산 — 3단계 우선순위로 처리
   // 1순위: tempLabel 일치 + confidence > 0 (AI 분류된 옷)
@@ -542,29 +548,25 @@ const handleAddClothes = async () => {
 
   try {
     const formData = new FormData();
+    formData.append('name', newItem.name);
     formData.append('category', newItem.category);
     formData.append('color', newItem.color || '기타');
+    formData.append('tempLabel', newItem.tempLabel || '');
+    formData.append('confidence', newItem.confidence || 0);
     formData.append('styleTags', JSON.stringify([]));
     formData.append('memo', '');
 
-    // 이미지 파일이 있으면 추가
     if (newItem.file) {
       formData.append('image', newItem.file);
-    } else if (newItem.imageUrl) {
-      // base64를 blob으로 변환
-      const res = await fetch(newItem.imageUrl);
-      const blob = await res.blob();
-      formData.append('image', blob, `${newItem.name}.jpg`);
     }
 
     const saved = await addCloth(formData);
-    // DB에서 저장된 데이터에 name, tempLabel, confidence 추가
     setClothes(prev => [...prev, {
       ...saved,
-      name: newItem.name,
-      tempLabel: newItem.tempLabel,
-      confidence: newItem.confidence,
-      imageUrl: saved.image_url || newItem.imageUrl,
+      name: saved.name,
+      tempLabel: saved.temp_label,
+      imageUrl: saved.image_url,
+      confidence: saved.confidence,
     }]);
   } catch (err) {
     alert('옷 저장에 실패했어요: ' + err.message);
