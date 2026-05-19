@@ -10,6 +10,8 @@ router.post('/', auth, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: '이미지를 업로드해주세요' });
 
+    console.log('받은 body:', req.body); // 디버그용
+
     const category   = req.body.category   || '상의';
     const color      = req.body.color      || '기타';
     const name       = req.body.name       || '';
