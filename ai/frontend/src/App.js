@@ -414,6 +414,14 @@ function App() {
       return { best: [], worst: null, isSample: false, isUnclassified: false };
     }
 
+    // ✅ 여기에 추가
+    const tempLabelToTemp = {
+      '더움(25°C~)':    27,
+      '따뜻(16~24°C)':  20,
+      '쌀쌀(9~15°C)':   12,
+      '추움(~8°C)':      4,
+    };
+
     // 옷장이 비어있으면 샘플 사용
     if (clothes.length === 0) {
       const targetLabel = getTempLabel(weather.temp);
@@ -422,36 +430,39 @@ function App() {
         .sort((a, b) => b.confidence - a.confidence);
       const unmatched = SAMPLE_ITEMS
         .filter(c => c.tempLabel && c.tempLabel !== targetLabel && c.confidence > 0)
-        .sort((a, b) => b.confidence - a.confidence);
+        // ✅ 여기도 수정
+        .sort((a, b) => {
+          const diffA = Math.abs((tempLabelToTemp[a.tempLabel] ?? 15) - weather.temp);
+          const diffB = Math.abs((tempLabelToTemp[b.tempLabel] ?? 15) - weather.temp);
+          return diffB - diffA;
+        });
       return { best: matched.slice(0, 2), worst: unmatched[0] || null, isSample: true, isUnclassified: false };
     }
 
-    // 옷장에 옷이 있는 경우
     const targetLabel = getTempLabel(weather.temp);
-
-    // 1순위: AI 분류된 옷 중 날씨 일치
     const classified = clothes.filter(c => c.tempLabel && c.confidence > 0);
     const matched = classified
       .filter(c => c.tempLabel === targetLabel)
       .sort((a, b) => b.confidence - a.confidence);
 
-    // WORST: AI 분류된 옷 중 날씨 불일치
+    // ✅ 여기도 수정
     const unmatched = classified
       .filter(c => c.tempLabel !== targetLabel)
-      .sort((a, b) => b.confidence - a.confidence);
+      .sort((a, b) => {
+        const diffA = Math.abs((tempLabelToTemp[a.tempLabel] ?? 15) - weather.temp);
+        const diffB = Math.abs((tempLabelToTemp[b.tempLabel] ?? 15) - weather.temp);
+        return diffB - diffA;
+      });
 
     if (matched.length > 0) {
-      // AI 분류된 날씨 맞는 옷이 있으면 그걸로 표시
       return { best: matched.slice(0, 2), worst: unmatched[0] || null, isSample: false, isUnclassified: false };
     }
 
-    // 2순위: AI 분류 없는 옷들 (사진 없이 추가한 옷)
     const unclassified = clothes.filter(c => !c.tempLabel || c.confidence === 0);
     if (unclassified.length > 0) {
       return { best: unclassified.slice(0, 2), worst: unmatched[0] || null, isSample: false, isUnclassified: true };
     }
 
-    // 분류된 옷은 있지만 오늘 날씨에 맞는 게 없는 경우
     return { best: [], worst: unmatched[0] || null, isSample: false, isUnclassified: false };
   };
 
