@@ -174,8 +174,8 @@ function getWeatherDesc(code) {
 }
 
 function getOutfitTip(temp) {
-  if (temp >= 28) return '민소매 + 반바지 조합';
-  if (temp >= 23) return '반팔 + 반바지 조합';
+  if (temp >= 28) return '반팔 + 반바지 조합';
+  if (temp >= 23) return '얇은가디건 + 청바지 조합';
   if (temp >= 17) return '긴팔 셔츠 + 슬랙스';
   if (temp >= 10) return '맨투맨 + 청바지';
   if (temp >= 5)  return '코트 + 니트 추천';
