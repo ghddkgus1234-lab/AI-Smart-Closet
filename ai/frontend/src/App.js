@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import AuthPage from './AuthPage';
 import { getClothes, addCloth, deleteCloth } from './api';
 
-const GEMINI_API_KEY = 'AIzaSyBI_A-SOy-AHi_pkkBSePfjYyGIZofMl1s';
+const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY;
 
 // ✅ 전체 코디 추천 카드용 (항상 샘플로 표시)
 const SAMPLE_OUTFITS = [
@@ -253,7 +253,7 @@ function Chatbot({ clothes, weather }) {
     const systemPrompt = `당신은 AI 스마트 옷장 코디 전문가입니다. 사용자의 옷장과 날씨 정보를 바탕으로 코디를 추천해주세요.\n현재 옷장: ${closetInfo}\n${weatherInfo}\n답변은 친근하고 간결하게 한국어로 해주세요. 이모지를 적절히 사용해주세요.`;
     try {
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
