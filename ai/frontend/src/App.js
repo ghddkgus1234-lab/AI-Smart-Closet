@@ -191,6 +191,18 @@ function getOutfitTip(temp) {
   return '두꺼운 패딩 필수!';
 }
 
+const CITIES = [
+  { name: '서울', lat: 37.5665, lon: 126.9780 },
+  { name: '부산', lat: 35.1796, lon: 129.0756 },
+  { name: '대구', lat: 35.8714, lon: 128.6014 },
+  { name: '인천', lat: 37.4563, lon: 126.7052 },
+  { name: '광주', lat: 35.1595, lon: 126.8526 },
+  { name: '대전', lat: 36.3504, lon: 127.3845 },
+  { name: '수원', lat: 37.2636, lon: 127.0286 },
+  { name: '안산', lat: 37.3219, lon: 126.8309 },
+  { name: '제주', lat: 33.4996, lon: 126.5312 },
+];
+
 function getTempLabel(temp) {
   if (temp >= 25) return '더움(25°C~)';
   if (temp >= 16) return '따뜻(16~24°C)';
@@ -350,6 +362,7 @@ function App() {
   const [previewUrl, setPreviewUrl] = useState('');
   const [weather, setWeather] = useState(null);
   const [weatherLoading, setWeatherLoading] = useState(true);
+  const [selectedCity, setSelectedCity] = useState(CITIES[0]);
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -384,7 +397,8 @@ function App() {
   };
 
   useEffect(() => {
-    fetch('https://api.open-meteo.com/v1/forecast?latitude=37.5665&longitude=126.9780&current=temperature_2m,weathercode&timezone=Asia%2FSeoul')
+    setWeatherLoading(true);
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${selectedCity.lat}&longitude=${selectedCity.lon}&current=temperature_2m,weathercode&timezone=Asia%2FSeoul`)
       .then(res => res.json())
       .then(data => {
         const temp = Math.round(data.current.temperature_2m);
@@ -397,7 +411,7 @@ function App() {
         setWeather({ temp: '--', text: '날씨 정보 없음', emoji: '🌈' });
         setWeatherLoading(false);
       });
-  }, []);
+  }, [selectedCity]);
 
   // DB에서 옷 불러오기
   useEffect(() => {
@@ -622,11 +636,12 @@ const handleEditOpen = (item) => {
 const handleEditSave = async () => {
   if (!editItem.name) return alert('이름을 입력해주세요!');
   try {
-    const formData = new FormData();
-    formData.append('name', editItem.name);
-    formData.append('category', editItem.category);
-    formData.append('color', editItem.color || '기타');
-    const saved = await updateCloth(editItem.id, formData);
+    // ✅ FormData 대신 JSON으로 변경
+    const saved = await updateCloth(editItem.id, {
+      name: editItem.name,
+      category: editItem.category,
+      color: editItem.color || '기타',
+    });
     setClothes(prev => prev.map(c => c.id === editItem.id ? {
       ...c,
       name: saved.name || editItem.name,
@@ -667,7 +682,27 @@ const handleEditSave = async () => {
       <div style={styles.dashboard}>
         <div style={styles.card}>
           <div style={{ fontSize: '36px' }}>{weatherLoading ? '⏳' : weather.emoji}</div>
-          <h3 style={styles.cardTitle}>오늘의 날씨 (서울)</h3>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', margin: '15px 0 5px 0' }}>
+            <h3 style={{ fontSize: '1rem', color: '#475569', margin: 0 }}>오늘의 날씨</h3>
+            <select
+              value={selectedCity.name}
+              onChange={e => setSelectedCity(CITIES.find(c => c.name === e.target.value))}
+              style={{
+                padding: '4px 8px',
+                borderRadius: '10px',
+                border: '1px solid #E2E8F0',
+                fontSize: '0.85rem',
+                fontWeight: '600',
+                color: '#4C6EF5',
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+            >
+              {CITIES.map(city => (
+                <option key={city.name} value={city.name}>{city.name}</option>
+              ))}
+            </select>
+          </div>
           <p style={styles.cardContent}>{weatherLoading ? '불러오는 중...' : `${weather.temp}°C / ${weather.text}`}</p>
         </div>
         <div style={styles.cardHighlight}>

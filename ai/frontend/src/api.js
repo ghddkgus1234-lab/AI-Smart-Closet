@@ -51,12 +51,14 @@ export async function deleteCloth(id) {
   return res.json();
 }
 
-// ✅ 수정 API 추가
-export async function updateCloth(id, formData) {
+export async function updateCloth(id, data) {
   const res = await fetch(`${BASE}/clothes/${id}`, {
     method: 'PUT',
-    headers: { Authorization: `Bearer ${getToken()}` },
-    body: formData,
+    headers: { 
+      Authorization: `Bearer ${getToken()}`,
+      'Content-Type': 'application/json',  // ✅ JSON으로 변경
+    },
+    body: JSON.stringify(data),  // ✅ JSON으로 변경
   });
   return res.json();
 }
