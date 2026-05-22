@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import AuthPage from './AuthPage';
-import { getClothes, addCloth, deleteCloth } from './api';
+import { getClothes, addCloth, deleteCloth, updateCloth } from './api';
 
 const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY;
 
@@ -171,6 +171,15 @@ function getWeatherDesc(code) {
   if (code <= 84) return { text: '소나기', emoji: '🌧' };
   if (code <= 99) return { text: '뇌우', emoji: '⛈' };
   return { text: '알 수 없음', emoji: '🌈' };
+}
+function getWeatherAlert(code, temp) {
+  if (code >= 51 && code <= 67) return { msg: '오늘 비가 오니 우산을 챙기세요! ☂️', color: '#3B82F6' };
+  if (code >= 71 && code <= 77) return { msg: '눈이 오니 미끄럼 주의! 방한 준비하세요 ❄️', color: '#60A5FA' };
+  if (code >= 80 && code <= 82) return { msg: '소나기가 예상돼요! 우산 챙기는 거 잊지 마세요 🌧', color: '#6366F1' };
+  if (code >= 95 && code <= 99) return { msg: '뇌우 예보! 가급적 외출을 자제하세요 ⛈', color: '#EF4444' };
+  if (temp >= 33) return { msg: '매우 더운 날씨예요! 자외선 차단제 챙기세요 🌞', color: '#F97316' };
+  if (temp <= 0)  return { msg: '영하의 날씨예요! 두꺼운 패딩 필수 🥶', color: '#60A5FA' };
+  return null;
 }
 
 function getOutfitTip(temp) {
@@ -343,6 +352,8 @@ function App() {
   const [weatherLoading, setWeatherLoading] = useState(true);
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editItem, setEditItem] = useState(null);
 
   // 전체 코디 추천 카드 이미지 상태 (항상 샘플)
   const [sampleImages, setSampleImages] = useState(() => {
@@ -379,7 +390,7 @@ function App() {
         const temp = Math.round(data.current.temperature_2m);
         const code = data.current.weathercode;
         const { text, emoji } = getWeatherDesc(code);
-        setWeather({ temp, text, emoji });
+        setWeather({ temp, text, emoji, code });
         setWeatherLoading(false);
       })
       .catch(() => {
@@ -598,6 +609,36 @@ const handleDelete = async (id) => {
     alert('삭제에 실패했어요: ' + err.message);
   }
 };
+const handleEditOpen = (item) => {
+  setEditItem({
+    id: item.id,
+    name: item.name,
+    category: item.category,
+    color: item.color || '',
+  });
+  setShowEditModal(true);
+};
+
+const handleEditSave = async () => {
+  if (!editItem.name) return alert('이름을 입력해주세요!');
+  try {
+    const formData = new FormData();
+    formData.append('name', editItem.name);
+    formData.append('category', editItem.category);
+    formData.append('color', editItem.color || '기타');
+    const saved = await updateCloth(editItem.id, formData);
+    setClothes(prev => prev.map(c => c.id === editItem.id ? {
+      ...c,
+      name: saved.name || editItem.name,
+      category: saved.category || editItem.category,
+      color: saved.color || editItem.color,
+    } : c));
+    setShowEditModal(false);
+    setEditItem(null);
+  } catch (err) {
+    alert('수정에 실패했어요: ' + err.message);
+  }
+};
 
   if (!token) return <AuthPage onLogin={handleLogin} />;
 
@@ -635,6 +676,27 @@ const handleDelete = async (id) => {
           <p style={styles.cardContent}>{weather && !weatherLoading ? getOutfitTip(weather.temp) : '날씨 분석 중...'}</p>
         </div>
       </div>
+
+      {/* ✅ 날씨 알림 */}
+      {weather && !weatherLoading && (() => {
+        const alert = getWeatherAlert(weather.code, weather.temp);
+        return alert ? (
+          <div style={{
+            maxWidth: '600px',
+            margin: '-30px auto 40px auto',
+            backgroundColor: 'white',
+            borderRadius: '16px',
+            padding: '16px 24px',
+            borderLeft: `6px solid ${alert.color}`,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+            fontSize: '1rem',
+            fontWeight: '600',
+            color: '#1E293B',
+          }}>
+            {alert.msg}
+          </div>
+        ) : null;
+      })()}
 
       {/* ✅ 오늘의 추천 코디 — BEST/WORST */}
       <section style={styles.recommendSection}>
@@ -761,7 +823,10 @@ const handleDelete = async (id) => {
                 {item.tempLabel && <span style={styles.tempTag}>🌡 {item.tempLabel}</span>}
                 {item.confidence > 0 && <span style={styles.tag}>{Number(item.confidence).toFixed(1)}%</span>}
               </div>
-              <button onClick={() => handleDelete(item.id)} style={styles.deleteBtn}>🗑 삭제</button>
+              <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', marginTop: '12px' }}>
+                <button onClick={() => handleEditOpen(item)} style={styles.editBtn}>✏️ 수정</button>
+                <button onClick={() => handleDelete(item.id)} style={styles.deleteBtn}>🗑 삭제</button>
+              </div>
             </div>
           )) : (
             <div style={styles.emptyState}>
@@ -820,6 +885,40 @@ const handleDelete = async (id) => {
             <div style={{ display: 'flex', gap: '12px' }}>
               <button onClick={handleAddClothes} style={styles.confirmBtn}>추가하기</button>
               <button onClick={() => { setShowAddModal(false); setPreviewUrl(''); setAiResult(null); }} style={styles.cancelBtn}>취소</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 옷 수정 모달 */}
+      {showEditModal && editItem && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modal}>
+            <h3 style={{ marginBottom: '20px', color: '#1E293B' }}>✏️ 옷 수정</h3>
+            <input
+              placeholder="옷 이름"
+              value={editItem.name}
+              onChange={e => setEditItem(prev => ({ ...prev, name: e.target.value }))}
+              style={styles.input}
+            />
+            <select
+              value={editItem.category}
+              onChange={e => setEditItem(prev => ({ ...prev, category: e.target.value }))}
+              style={styles.input}
+            >
+              {['상의', '하의', '아우터', '신발'].map(cat => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+            <input
+              placeholder="색상 (예: 화이트, 블랙)"
+              value={editItem.color}
+              onChange={e => setEditItem(prev => ({ ...prev, color: e.target.value }))}
+              style={styles.input}
+            />
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button onClick={handleEditSave} style={styles.confirmBtn}>저장하기</button>
+              <button onClick={() => { setShowEditModal(false); setEditItem(null); }} style={styles.cancelBtn}>취소</button>
             </div>
           </div>
         </div>
@@ -885,6 +984,7 @@ const styles = {
   icon: { fontSize: '60px', marginBottom: '20px' },
   clothesName: { fontSize: '1.1rem', color: '#1E293B', marginBottom: '12px' },
   deleteBtn: { backgroundColor: '#FEE2E2', color: '#EF4444', border: 'none', padding: '8px 16px', borderRadius: '10px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' },
+  editBtn: { backgroundColor: '#EEF2FF', color: '#4C6EF5', border: 'none', padding: '8px 16px', borderRadius: '10px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' },
   emptyState: { gridColumn: '1 / -1', textAlign: 'center', padding: '80px 20px', backgroundColor: '#FFFFFF', borderRadius: '32px', border: '2px dashed #E2E8F0', color: '#94A3B8' },
   modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 },
   modal: { backgroundColor: 'white', borderRadius: '24px', padding: '40px', width: '90%', maxWidth: '480px', boxShadow: '0 25px 50px rgba(0,0,0,0.15)', maxHeight: '90vh', overflowY: 'auto' },

@@ -73,6 +73,33 @@ router.get('/:id', auth, async (req, res) => {
   }
 });
 
+// 옷 수정
+router.put('/:id', auth, async (req, res) => {
+  try {
+    const check = await pool.query(
+      'SELECT * FROM clothes WHERE id = $1 AND user_id = $2',
+      [req.params.id, req.userId]
+    );
+    if (check.rows.length === 0) return res.status(404).json({ message: '옷을 찾을 수 없습니다' });
+
+    const name     = req.body.name     || check.rows[0].name;
+    const category = req.body.category || check.rows[0].category;
+    const color    = req.body.color    || check.rows[0].color;
+
+    const result = await pool.query(
+      `UPDATE clothes 
+       SET name = $1, category = $2, color = $3
+       WHERE id = $4 AND user_id = $5
+       RETURNING *`,
+      [name, category, color, req.params.id, req.userId]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    res.status(500).json({ message: '서버 오류', error: err.message });
+  }
+});
+
 // 옷 삭제
 router.delete('/:id', auth, async (req, res) => {
   try {
