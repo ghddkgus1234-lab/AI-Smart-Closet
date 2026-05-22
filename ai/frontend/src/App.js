@@ -363,6 +363,8 @@ function App() {
   const [weather, setWeather] = useState(null);
   const [weatherLoading, setWeatherLoading] = useState(true);
   const [selectedCity, setSelectedCity] = useState(CITIES[0]);
+  const [weeklyWeather, setWeeklyWeather] = useState([]);
+  const [showWeekly, setShowWeekly] = useState(false);
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -398,13 +400,24 @@ function App() {
 
   useEffect(() => {
     setWeatherLoading(true);
-    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${selectedCity.lat}&longitude=${selectedCity.lon}&current=temperature_2m,weathercode&timezone=Asia%2FSeoul`)
+    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${selectedCity.lat}&longitude=${selectedCity.lon}&current=temperature_2m,weathercode&daily=temperature_2m_max,temperature_2m_min,weathercode&timezone=Asia%2FSeoul`)
       .then(res => res.json())
       .then(data => {
         const temp = Math.round(data.current.temperature_2m);
         const code = data.current.weathercode;
         const { text, emoji } = getWeatherDesc(code);
         setWeather({ temp, text, emoji, code });
+
+        // ✅ 주간 예보 추가
+        const daily = data.daily;
+        const weekly = daily.time.map((date, i) => ({
+          date,
+          max: Math.round(daily.temperature_2m_max[i]),
+          min: Math.round(daily.temperature_2m_min[i]),
+          code: daily.weathercode[i],
+          ...getWeatherDesc(daily.weathercode[i]),
+        }));
+        setWeeklyWeather(weekly);
         setWeatherLoading(false);
       })
       .catch(() => {
@@ -678,6 +691,68 @@ const handleEditSave = async () => {
         </div>
       </header>
 
+      {/* ✅ 주간 날씨 예보 */}
+      {weeklyWeather.length > 0 && (
+        <div style={{ maxWidth: '800px', margin: '0 auto 40px auto' }}>
+          <button
+            onClick={() => setShowWeekly(prev => !prev)}
+            style={{
+              width: '100%',
+              backgroundColor: 'white',
+              border: '2px solid #E2E8F0',
+              borderRadius: showWeekly ? '24px 24px 0 0' : '24px',
+              padding: '16px 24px',
+              cursor: 'pointer',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              fontSize: '1rem',
+              fontWeight: '700',
+              color: '#1E293B',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+            }}
+          >
+            <span>📅 이번 주 날씨</span>
+            <span>{showWeekly ? '▲' : '▼'}</span>
+          </button>
+
+          {showWeekly && (
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '0 0 24px 24px',
+              padding: '20px 24px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+              border: '2px solid #E2E8F0',
+              borderTop: 'none',
+            }}>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                {weeklyWeather.map((day, i) => {
+                  const date = new Date(day.date);
+                  const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+                  const dayName = i === 0 ? '오늘' : dayNames[date.getDay()];
+                  return (
+                    <div key={day.date} style={{
+                      flex: '1', minWidth: '80px', textAlign: 'center',
+                      padding: '12px 8px', borderRadius: '16px',
+                      backgroundColor: i === 0 ? '#EEF2FF' : '#F8FAFC',
+                      border: i === 0 ? '2px solid #4C6EF5' : '2px solid transparent',
+                    }}>
+                      <p style={{ fontSize: '0.85rem', fontWeight: '700', color: i === 0 ? '#4C6EF5' : '#475569', marginBottom: '6px' }}>
+                        {dayName}
+                      </p>
+                      <div style={{ fontSize: '24px', marginBottom: '6px' }}>{day.emoji}</div>
+                      <p style={{ fontSize: '0.85rem', fontWeight: '700', color: '#EF4444' }}>{day.max}°</p>
+                      <p style={{ fontSize: '0.8rem', color: '#94A3B8' }}>{day.min}°</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+
       {/* 날씨 대시보드 */}
       <div style={styles.dashboard}>
         <div style={styles.card}>
@@ -712,6 +787,7 @@ const handleEditSave = async () => {
         </div>
       </div>
 
+      
       {/* ✅ 날씨 알림 */}
       {weather && !weatherLoading && (() => {
         const alert = getWeatherAlert(weather.code, weather.temp);
