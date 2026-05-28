@@ -1,7 +1,7 @@
 const BASE = 'https://smartcloset-backend.onrender.com/api';
 
 function getToken() {
-  return localStorage.getItem('token');
+  return localStorage.getItem('token') || sessionStorage.getItem('token');
 }
 
 export async function login(username, password) {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import AuthPage from './AuthPage';
 import { getClothes, addCloth, deleteCloth, updateCloth } from './api';
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY;
 
@@ -182,26 +183,62 @@ function getWeatherAlert(code, temp) {
   return null;
 }
 
-function getOutfitTip(temp) {
+// ✅ 새 코드 (온도 + 날씨 상태 반영)
+function getOutfitTip(temp, code) {
+  const isRain = code >= 51 && code <= 82;
+  const isSnow = code >= 71 && code <= 77;
+
+  if (isSnow) return '패딩 + 방한 부츠 필수';
+  if (isRain && temp >= 17) return '우산 필수! 가디건 + 방수 재킷 추천';
+  if (isRain && temp < 17)  return '우산 필수! 코트 + 방수 신발 추천';
   if (temp >= 28) return '반팔 + 반바지 조합';
-  if (temp >= 23) return '얇은가디건 + 청바지 조합';
+  if (temp >= 23) return '얇은 가디건 + 청바지 조합';
   if (temp >= 17) return '긴팔 셔츠 + 슬랙스';
   if (temp >= 10) return '맨투맨 + 청바지';
   if (temp >= 5)  return '코트 + 니트 추천';
-  return '두꺼운 패딩 필수!';
+  return '두꺼운 패딩 필수! 🥶';
 }
 
 const CITIES = [
+  // 🇰🇷 국내
   { name: '서울', lat: 37.5665, lon: 126.9780 },
   { name: '부산', lat: 35.1796, lon: 129.0756 },
-  { name: '대구', lat: 35.8714, lon: 128.6014 },
-  { name: '인천', lat: 37.4563, lon: 126.7052 },
-  { name: '광주', lat: 35.1595, lon: 126.8526 },
-  { name: '대전', lat: 36.3504, lon: 127.3845 },
-  { name: '수원', lat: 37.2636, lon: 127.0286 },
-  { name: '안산', lat: 37.3219, lon: 126.8309 },
   { name: '제주', lat: 33.4996, lon: 126.5312 },
+  // 🌏 해외
+  { name: '시드니', lat: -33.8688, lon: 151.2093 },
+  { name: '방콕', lat: 13.7563, lon: 100.5018 },
+  { name: '두바이', lat: 25.2048, lon: 55.2708 },
+  { name: '런던', lat: 51.5074, lon: -0.1278 },
+  { name: '모스크바', lat: 55.7558, lon: 37.6173 },
+  { name: '상파울루', lat: -23.5505, lon: -46.6333 },
+  { name: '케이프타운', lat: -33.9249, lon: 18.4241 },
+  { name: '뉴욕', lat: 40.7128, lon: -74.0060 },
 ];
+
+const COLOR_MAP = {
+  '블랙': '#1a1a1a',
+  '화이트': '#f5f5f5',
+  '그레이': '#808080',
+  '다크그레이': '#404040',
+  '라이트그레이': '#c0c0c0',
+  '네이비': '#141e50',
+  '블루': '#1e50c8',
+  '스카이블루': '#64b4e6',
+  '레드': '#c81414',
+  '버건디': '#780a28',
+  '핑크': '#f096aa',
+  '오렌지': '#f0780a',
+  '옐로우': '#f0dc1e',
+  '그린': '#289628',
+  '카키': '#646e3c',
+  '민트': '#64d2be',
+  '퍼플': '#823cb4',
+  '라벤더': '#bea0dc',
+  '브라운': '#6e411e',
+  '베이지': '#d2b996',
+  '아이보리': '#f0e6c8',
+  '카멜': '#b4823c',
+};
 
 function getTempLabel(temp) {
   if (temp >= 25) return '더움(25°C~)';
@@ -369,6 +406,31 @@ function App() {
   const [aiLoading, setAiLoading] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
+  const [statsTab, setStatsTab] = useState('category');
+
+  const getCategoryStats = () => {
+      const counts = {};
+      clothes.forEach(c => {
+        counts[c.category] = (counts[c.category] || 0) + 1;
+      });
+      return Object.entries(counts).map(([name, value]) => ({ name, value }));
+    };
+
+    const getColorStats = () => {
+      const counts = {};
+      clothes.forEach(c => {
+        if (c.color) counts[c.color] = (counts[c.color] || 0) + 1;
+      });
+      return Object.entries(counts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8) // 상위 8개만
+        .map(([name, value]) => ({ name, value }));
+    };
+ 
+    const CHART_COLORS = [
+      '#4C6EF5', '#F06595', '#74C0FC', '#63E6BE',
+      '#FFA94D', '#A9E34B', '#E599F7', '#FF8787',
+    ];
 
   // 전체 코디 추천 카드 이미지 상태 (항상 샘플)
   const [sampleImages, setSampleImages] = useState(() => {
@@ -477,6 +539,8 @@ function App() {
       return { best: matched.slice(0, 2), worst: unmatched[0] || null, isSample: true, isUnclassified: false };
     }
 
+    
+
     const targetLabel = getTempLabel(weather.temp);
     const classified = clothes.filter(c => c.tempLabel && c.confidence > 0);
     const matched = classified
@@ -529,27 +593,26 @@ function App() {
   const handleImageUpload = async (e) => {
   const file = e.target.files[0];
   if (!file) return;
-
+ 
   // 미리보기
   const reader = new FileReader();
   reader.onloadend = () => {
-  setPreviewUrl(reader.result);
-  setNewItem(prev => ({ ...prev, imageUrl: reader.result, file: file })); // file 추가
-};
+    setPreviewUrl(reader.result);
+    setNewItem(prev => ({ ...prev, imageUrl: reader.result, file: file }));
+  };
   reader.readAsDataURL(file);
-
+ 
   const categoryToEndpoint = { '상의': 'top', '하의': 'bottoms', '아우터': 'outer' };
   const endpoint = categoryToEndpoint[newItem.category];
-  if (!endpoint) return;
-
+ 
   setAiLoading(true);
   setAiResult(null);
-
+ 
   try {
-    // FormData로 파일 직접 업로드
+    // FormData로 파일 업로드
     const formData = new FormData();
     formData.append('files', file);
-
+ 
     // 1단계: 파일 업로드
     const uploadRes = await fetch('https://jangso-smart-closet-ai.hf.space/gradio_api/upload', {
       method: 'POST',
@@ -558,34 +621,67 @@ function App() {
     if (!uploadRes.ok) throw new Error('업로드 실패');
     const uploadedPaths = await uploadRes.json();
     const filePath = uploadedPaths[0];
-
-    // 2단계: 예측 요청
-    const res = await fetch('https://jangso-smart-closet-ai.hf.space/gradio_api/call/gradio_predict', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        data: [{ path: filePath }, newItem.category]
+ 
+    // 2단계: 온도 분류 + 색상 분류 동시 요청
+    const [tempRes, colorRes] = await Promise.all([
+      // 온도 구간 분류 (카테고리 있는 경우만)
+      endpoint
+        ? fetch('https://jangso-smart-closet-ai.hf.space/gradio_api/call/gradio_predict', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data: [{ path: filePath }, newItem.category] }),
+          })
+        : null,
+      // 색상 분류
+      fetch('https://jangso-smart-closet-ai.hf.space/gradio_api/call/gradio_color', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: [{ path: filePath }] }),
       }),
-    });
-    if (!res.ok) throw new Error('서버 오류');
-    const { event_id } = await res.json();
-
-    // 3단계: 결과 가져오기
-    const resultRes = await fetch(
-      `https://jangso-smart-closet-ai.hf.space/gradio_api/call/gradio_predict/${event_id}`
-    );
-    const text = await resultRes.text();
-    const dataLine = text.split('\n').find(line => line.startsWith('data:'));
-    const json = JSON.parse(dataLine.replace('data: ', ''));
-    const labelStr = json[0];
-    console.log('labelStr:', labelStr);  // ← 이거 추가
-    console.log('json:', json);
-    const allProbs = json[1] || {};
-    const label = labelStr.replace(/\s+\(\d+\.?\d*%\)$/, '');
-    const confidence = parseFloat(labelStr.match(/\((\d+\.?\d*)%\)/)?.[1] || '0');
-
-    setAiResult({ label, confidence, all_probs: allProbs });
-    setNewItem(prev => ({ ...prev, tempLabel: label, confidence }));
+    ]);
+ 
+    // 3단계: 온도 결과 처리
+    let label = '';
+    let confidence = 0;
+    let allProbs = {};
+ 
+    if (tempRes && tempRes.ok) {
+      const { event_id } = await tempRes.json();
+      const resultRes = await fetch(
+        `https://jangso-smart-closet-ai.hf.space/gradio_api/call/gradio_predict/${event_id}`
+      );
+      const text = await resultRes.text();
+      const dataLine = text.split('\n').find(line => line.startsWith('data:'));
+      const json = JSON.parse(dataLine.replace('data: ', ''));
+      const labelStr = json[0];
+      allProbs = json[1] || {};
+      label = labelStr.replace(/\s+\(\d+\.?\d*%\)$/, '');
+      confidence = parseFloat(labelStr.match(/\((\d+\.?\d*)%\)/)?.[1] || '0');
+    }
+ 
+    // 4단계: 색상 결과 처리
+    let colorName = '';
+    if (colorRes && colorRes.ok) {
+      const { event_id: colorEventId } = await colorRes.json();
+      const colorResultRes = await fetch(
+        `https://jangso-smart-closet-ai.hf.space/gradio_api/call/gradio_color/${colorEventId}`
+      );
+      const colorText = await colorResultRes.text();
+      const colorDataLine = colorText.split('\n').find(line => line.startsWith('data:'));
+      const colorJson = JSON.parse(colorDataLine.replace('data: ', ''));
+      // colorJson[0] = "주요 색상: 네이비" 형태
+      colorName = colorJson[0]?.replace('주요 색상: ', '') || '';
+    }
+ 
+    // 5단계: 상태 업데이트
+    setAiResult({ label, confidence, all_probs: allProbs, color: colorName });
+    setNewItem(prev => ({
+      ...prev,
+      tempLabel: label,
+      confidence,
+      color: colorName, // 색상 자동 입력
+    }));
+ 
   } catch (err) {
     setAiResult({ error: 'AI 서버에 연결할 수 없습니다.' });
   } finally {
@@ -783,7 +879,7 @@ const handleEditSave = async () => {
         <div style={styles.cardHighlight}>
           <div style={{ fontSize: '36px' }}>✨</div>
           <h3 style={styles.cardTitle}>날씨별 추천 코디</h3>
-          <p style={styles.cardContent}>{weather && !weatherLoading ? getOutfitTip(weather.temp) : '날씨 분석 중...'}</p>
+          <p style={styles.cardContent}>{weather && !weatherLoading ? getOutfitTip(weather.temp, weather.code) : '날씨 분석 중...'}</p>
         </div>
       </div>
 
@@ -904,11 +1000,117 @@ const handleEditSave = async () => {
         </div>
       </section>
 
+      {clothes.length > 0 && (
+        <section style={{ maxWidth: '1100px', margin: '0 auto 60px auto' }}>
+          <h2 style={styles.sectionTitle}>📊 내 옷장 통계</h2>
+      
+          {/* 탭 */}
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '28px' }}>
+            {[
+              { key: 'category', label: '👕 카테고리별' },
+              { key: 'color',    label: '🎨 색상별' },
+            ].map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => setStatsTab(tab.key)}
+                style={{
+                  padding: '10px 24px',
+                  borderRadius: '14px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontWeight: '700',
+                  fontSize: '0.95rem',
+                  backgroundColor: statsTab === tab.key ? '#4C6EF5' : 'white',
+                  color: statsTab === tab.key ? 'white' : '#64748B',
+                  boxShadow: statsTab === tab.key
+                    ? '0 4px 12px rgba(76,110,245,0.3)'
+                    : '0 2px 8px rgba(0,0,0,0.06)',
+                }}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+      
+          {/* 차트 */}
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '24px',
+            padding: '32px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.06)',
+          }}>
+            {statsTab === 'category' ? (
+              <>
+                <p style={{ color: '#94A3B8', marginBottom: '24px', fontSize: '0.95rem' }}>
+                  총 {clothes.length}벌 보유 중
+                </p>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={getCategoryStats()}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={110}
+                      dataKey="value"
+                      label={({ name, value, percent }) =>
+                        `${name} ${value}벌 (${(percent * 100).toFixed(0)}%)`
+                      }
+                      labelLine={true}
+                    >
+                      {getCategoryStats().map((_, index) => (
+                        <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => [`${value}벌`, '수량']} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </>
+            ) : (
+              <>
+                <p style={{ color: '#94A3B8', marginBottom: '24px', fontSize: '0.95rem' }}>
+                  상위 8개 색상 기준
+                </p>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={getColorStats()}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={110}
+                      dataKey="value"
+                      label={({ name, value, percent }) =>
+                        `${name} ${value}벌 (${(percent * 100).toFixed(0)}%)`
+                      }
+                      labelLine={true}
+                    >
+                      {getColorStats().map((entry, index) => (
+                        <Cell
+                          key={index}
+                          fill={COLOR_MAP[entry.name] || CHART_COLORS[index % CHART_COLORS.length]}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => [`${value}벌`, '수량']} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </>
+            )}
+          </div>
+        </section>
+      )}
+
       {/* 내 옷장 */}
       <main style={styles.main}>
         <div style={styles.closetHeader}>
           <h2 style={styles.sectionTitle}>🗂 내 옷장</h2>
-          <button onClick={() => setShowAddModal(true)} style={styles.addBtn}>+ 옷 추가</button>
+          <button onClick={() => {
+            setShowAddModal(true);
+            setNewItem({ name: '', category: '상의', color: '', imageUrl: '', tempLabel: '', confidence: 0 });
+            setPreviewUrl('');
+            setAiResult(null);
+          }} style={styles.addBtn}>+ 옷 추가</button>
         </div>
         <div style={styles.filterBar}>
           {['전체', '상의', '하의', '아우터', '신발'].map(cat => (
@@ -929,7 +1131,22 @@ const handleEditSave = async () => {
               }
               <h4 style={styles.clothesName}>{item.name}</h4>
               <div style={styles.tagGroup}>
-                {item.color && <span style={styles.tag}>{item.color}</span>}
+                
+                {item.color && (
+                  <span style={styles.tag}>
+                    <span style={{
+                      display: 'inline-block',
+                      width: '10px',
+                      height: '10px',
+                      borderRadius: '50%',
+                      backgroundColor: COLOR_MAP[item.color] || '#CBD5E0',
+                      marginRight: '5px',
+                      verticalAlign: 'middle',
+                      border: '1px solid rgba(0,0,0,0.1)',
+                    }} />
+                    {item.color}
+                  </span>
+                )}
                 <span style={styles.tag}>{item.category}</span>
                 {item.tempLabel && <span style={styles.tempTag}>🌡 {item.tempLabel}</span>}
                 {item.confidence > 0 && <span style={styles.tag}>{Number(item.confidence).toFixed(1)}%</span>}
@@ -959,8 +1176,13 @@ const handleEditSave = async () => {
             <select value={newItem.category} onChange={handleCategoryChange} style={styles.input}>
               {['상의', '하의', '아우터', '신발'].map(cat => <option key={cat} value={cat}>{cat}</option>)}
             </select>
-            <input placeholder="색상 (예: 화이트, 블랙)" value={newItem.color}
-              onChange={e => setNewItem(prev => ({ ...prev, color: e.target.value }))} style={styles.input} />
+            <div style={{ ...styles.input, backgroundColor: '#F8FAFC', color: newItem.color ? '#1E293B' : '#94A3B8', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+              {newItem.color
+                ? <><span>🎨</span><span>{newItem.color} (AI 자동 분류)</span></>
+                : <span>색상은 사진 업로드 시 자동 분류돼요</span>
+              }
+            </div>
+              
             <label style={styles.uploadLabel}>
               📷 사진 업로드 {['상의', '하의', '아우터'].includes(newItem.category) ? '(업로드 시 AI 자동 분류)' : ''}
               <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
