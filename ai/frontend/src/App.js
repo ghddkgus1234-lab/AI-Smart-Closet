@@ -213,6 +213,7 @@ const CITIES = [
   { name: '상파울루', lat: -23.5505, lon: -46.6333 },
   { name: '케이프타운', lat: -33.9249, lon: 18.4241 },
   { name: '뉴욕', lat: 40.7128, lon: -74.0060 },
+  { name: '레이캬비크', lat: 64.1355, lon: -21.8954 },
 ];
 
 const COLOR_MAP = {
@@ -392,7 +393,7 @@ function App() {
   const [nickname, setNickname] = useState(localStorage.getItem('nickname') || sessionStorage.getItem('nickname') || '');
   const [token, setToken] = useState(localStorage.getItem('token') || sessionStorage.getItem('token') || '');
   const [clothes, setClothes] = useState([]);
-  const [clothesLoading, setClothesLoading] = useState(true); // eslint-disable-line no-unused-vars
+  const [clothesLoading, setClothesLoading] = useState(true);
   const [filter, setFilter] = useState('전체');
   const [showAddModal, setShowAddModal] = useState(false);
   const [newItem, setNewItem] = useState({ name: '', category: '상의', color: '', imageUrl: '', tempLabel: '', confidence: 0 });
@@ -407,6 +408,10 @@ function App() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [statsTab, setStatsTab] = useState('category');
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profileInfo, setProfileInfo] = useState(null);
+  const [passwordForm, setPasswordForm] = useState({ current: '', new: '', confirm: '' });
+  const [passwordMsg, setPasswordMsg] = useState('');
 
   const getCategoryStats = () => {
       const counts = {};
@@ -509,9 +514,10 @@ function App() {
   // 1순위: tempLabel 일치 + confidence > 0 (AI 분류된 옷)
   // 2순위: tempLabel 없는 옷 (사진 없이 추가한 옷) → BEST로 표시
   // 옷장이 비어있으면: SAMPLE_ITEMS 사용
+  console.log('clothes.length:', clothes.length);
   const getBestWorst = () => {
     if (!weather || weather.temp === '--') {
-      return { best: [], worst: null, isSample: false, isUnclassified: false };
+      return { best: [], worst: [], isSample: false, isUnclassified: false };
     }
 
     // ✅ 여기에 추가
@@ -524,6 +530,7 @@ function App() {
 
     // 옷장이 비어있으면 샘플 사용
     if (clothes.length === 0) {
+      console.log('샘플로 빠짐!'); // ← 추가
       const targetLabel = getTempLabel(weather.temp);
       const matched = SAMPLE_ITEMS
         .filter(c => c.tempLabel === targetLabel && c.confidence > 0)
@@ -536,16 +543,22 @@ function App() {
           const diffB = Math.abs((tempLabelToTemp[b.tempLabel] ?? 15) - weather.temp);
           return diffB - diffA;
         });
-      return { best: matched.slice(0, 2), worst: unmatched[0] || null, isSample: true, isUnclassified: false };
+      return { best: matched.slice(0, 3), worst: unmatched.slice(0, 2), isSample: true, isUnclassified: false };
     }
+    console.log('옷장 있음, 정상 진행'); // ← 추가
 
     
 
     const targetLabel = getTempLabel(weather.temp);
     const classified = clothes.filter(c => c.tempLabel && c.confidence > 0);
+    console.log('전체 옷:', clothes);
+    console.log('classified:', classified);
+    console.log('targetLabel:', targetLabel);
     const matched = classified
       .filter(c => c.tempLabel === targetLabel)
       .sort((a, b) => b.confidence - a.confidence);
+    console.log('matched:', matched);
+    console.log('샘플 tempLabel 예시:', clothes[0]?.tempLabel);
 
     // ✅ 여기도 수정
     const unmatched = classified
@@ -557,18 +570,21 @@ function App() {
       });
 
     if (matched.length > 0) {
-      return { best: matched.slice(0, 2), worst: unmatched[0] || null, isSample: false, isUnclassified: false };
+      return { best: matched.slice(0, 3), worst: unmatched.slice(0, 2), isSample: true, isUnclassified: false };
     }
 
     const unclassified = clothes.filter(c => !c.tempLabel || c.confidence === 0);
     if (unclassified.length > 0) {
-      return { best: unclassified.slice(0, 2), worst: unmatched[0] || null, isSample: false, isUnclassified: true };
+      return { best: unclassified.slice(0, 3), worst: unmatched.slice(0, 2) || null, isSample: false, isUnclassified: true };
     }
 
-    return { best: [], worst: unmatched[0] || null, isSample: false, isUnclassified: false };
+    return { best: [], worst: [], isSample: false, isUnclassified: false };
   };
 
-  const { best, worst, isSample, isUnclassified } = getBestWorst();
+  const { best, worst, isSample, isUnclassified } = clothesLoading
+    ? { best: [], worst: [], isSample: false, isUnclassified: false }
+    : getBestWorst();
+  console.log('isSample:', isSample, 'clothes.length:', clothes.length);
 
   const handleLogin = (nick, keepLogin) => {
     setNickname(nick);
@@ -585,6 +601,57 @@ function App() {
     sessionStorage.removeItem('nickname');
     setToken('');
     setNickname('');
+  };
+  const handleProfileOpen = async () => {
+    console.log('token:', token);
+    try {
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      setProfileInfo(data);
+      setShowProfileModal(true);
+      setPasswordMsg('');
+      setPasswordForm({ current: '', new: '', confirm: '' });
+    } catch (err) {
+      alert('정보를 불러오지 못했어요');
+    }
+  };
+
+  const handlePasswordChange = async () => {
+    if (passwordForm.new !== passwordForm.confirm)
+      return setPasswordMsg('❌ 새 비밀번호가 일치하지 않아요');
+    if (passwordForm.new.length < 4)
+      return setPasswordMsg('❌ 비밀번호는 4자 이상이어야 해요');
+    try {
+      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/password`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ currentPassword: passwordForm.current, newPassword: passwordForm.new })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPasswordMsg('✅ 비밀번호가 변경됐어요!');
+        setPasswordForm({ current: '', new: '', confirm: '' });
+      } else {
+        setPasswordMsg(`❌ ${data.message}`);
+      }
+    } catch (err) {
+      setPasswordMsg('❌ 서버 오류가 발생했어요');
+    }
+  };
+
+  const handleWithdraw = async () => {
+    if (!window.confirm('정말 탈퇴하시겠어요? 모든 옷장 데이터가 삭제됩니다.')) return;
+    try {
+      await fetch(`${process.env.REACT_APP_API_URL}/api/auth/withdraw`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      handleLogout();
+    } catch (err) {
+      alert('탈퇴에 실패했어요: ' + err.message);
+    }
   };
   const handleCategoryChange = (e) => {
     setNewItem(prev => ({ ...prev, category: e.target.value, tempLabel: '', confidence: 0 }));
@@ -769,12 +836,13 @@ const handleEditSave = async () => {
   const filteredClothes = filter === '전체' ? clothes : clothes.filter(item => item.category === filter);
 
   // 안내 메시지 결정
-  const recommendNote = isSample
-    ? '📦 옷장이 비어있어요! 샘플 아이템으로 추천해드릴게요.'
-    : isUnclassified
-      ? '📷 AI 분류 정보가 없는 옷이에요. 사진을 업로드하면 날씨별 정확한 추천을 받을 수 있어요!'
-      : '👚 내 옷장 기반으로 오늘 날씨에 맞는 코디를 추천해드려요!';
-
+  const recommendNote = clothesLoading
+    ? '⏳ 옷장 불러오는 중...'
+    : clothes.length === 0
+      ? '📦 옷장이 비어있어요! 샘플 아이템으로 추천해드릴게요.'
+      : isUnclassified
+        ? '📷 AI 분류 정보가 없는 옷이에요. 사진을 업로드하면 날씨별 정확한 추천을 받을 수 있어요!'
+        : '👚 내 옷장 기반으로 오늘 날씨에 맞는 코디를 추천해드려요!';
   return (
     <div style={styles.container}>
       {/* 헤더 */}
@@ -782,7 +850,10 @@ const handleEditSave = async () => {
         <h1 style={styles.title}>👗 AI Smart Closet</h1>
         <p style={styles.subtitle}>오늘 당신에게 가장 잘 어울리는 옷을 찾아드려요.</p>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginTop: '12px' }}>
-          <span style={{ color: '#4C6EF5', fontWeight: '700' }}>👤 {nickname}님</span>
+          <span
+            onClick={handleProfileOpen}
+            style={{ color: '#4C6EF5', fontWeight: '700', cursor: 'pointer', textDecoration: 'underline' }}
+          >👤 {nickname}님</span>
           <button onClick={handleLogout} style={{ backgroundColor: '#FEE2E2', color: '#EF4444', border: 'none', padding: '8px 16px', borderRadius: '10px', cursor: 'pointer', fontWeight: '600' }}>로그아웃</button>
         </div>
       </header>
@@ -821,7 +892,13 @@ const handleEditSave = async () => {
               border: '2px solid #E2E8F0',
               borderTop: 'none',
             }}>
-              <div style={{ display: 'flex', gap: '12px' }}>
+              <div style={{
+                display: 'flex',
+                gap: '12px',
+                overflowX: 'auto',
+                paddingBottom: '8px',
+                WebkitOverflowScrolling: 'touch',
+              }}>
                 {weeklyWeather.map((day, i) => {
                   const date = new Date(day.date);
                   const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
@@ -908,53 +985,59 @@ const handleEditSave = async () => {
       {/* ✅ 오늘의 추천 코디 — BEST/WORST */}
       <section style={styles.recommendSection}>
         <h2 style={styles.sectionTitle}>✨ 오늘의 추천 코디</h2>
-        <p style={styles.sampleNote}>{recommendNote}</p>
-        <div style={styles.bestWorstRow}>
-          {best.length > 0 ? best.map((item, idx) => (
-            <div key={item.id} style={styles.bestCard}>
-              <div style={styles.bestBadge}>
-                🏆 BEST {idx + 1}{isSample ? ' (샘플)' : isUnclassified ? ' (미분류)' : ''}
-              </div>
-              <RecommendImage item={item} style={styles.recommendImg} />
-              <p style={styles.recommendName}>{item.name || item.title}</p>
-              <p style={styles.recommendCategory}>{item.category}</p>
-              {item.confidence > 0 ? (
-                <>
+        {clothesLoading ? (
+          <p style={{ color: '#94A3B8', fontSize: '1rem' }}>⏳ 옷장 불러오는 중...</p>
+        ) : (
+          <>
+            <p style={styles.sampleNote}>{recommendNote}</p>
+            <div style={styles.bestWorstRow}>
+              {best.length > 0 ? best.map((item, idx) => (
+                <div key={item.id} style={styles.bestCard}>
+                  <div style={styles.bestBadge}>
+                    🏆 BEST {idx + 1}{clothes.length === 0 ? ' (샘플)' : isUnclassified ? ' (미분류)' : ''}
+                  </div>
+                  <RecommendImage item={item} style={styles.recommendImg} />
+                  <p style={styles.recommendName}>{item.name || item.title}</p>
+                  <p style={styles.recommendCategory}>{item.category}</p>
+                  {item.confidence > 0 ? (
+                    <>
+                      <div style={styles.confidenceBar}>
+                        <div style={{ ...styles.confidenceFill, width: `${item.confidence}%`, backgroundColor: '#4C6EF5' }} />
+                      </div>
+                      <p style={styles.confidenceText}>AI 확신도 {Number(item.confidence).toFixed(1)}%</p>
+                      <span style={styles.tempTagGreen}>🌡 {item.tempLabel}</span>
+                    </>
+                  ) : (
+                    <p style={{ color: '#94A3B8', fontSize: '0.82rem', marginTop: '8px' }}>
+                      📷 사진 업로드 시 AI 분류 가능
+                    </p>
+                  )}
+                </div>
+              )) : (
+                <div style={styles.emptyRecommend}>
+                  <p>😅 오늘 날씨에 맞는 옷이 없어요!</p>
+                  <p style={{ fontSize: '0.9rem', color: '#94A3B8' }}>
+                    {clothes.length > 0 ? '사진을 업로드해서 AI 분류를 받아보세요.' : '옷을 추가해보세요.'}
+                  </p>
+                </div>
+              )}
+              {worst.map((item, idx) => (
+                <div key={item.id} style={styles.worstCard}>
+                  <div style={styles.worstBadge}>❌ WORST {idx + 1}{clothes.length === 0 ? ' (샘플)' : ''}</div>
+                  <RecommendImage item={item} style={styles.recommendImg} />
+                  <p style={styles.recommendName}>{item.name || item.title}</p>
+                  <p style={styles.recommendCategory}>{item.category}</p>
                   <div style={styles.confidenceBar}>
-                    <div style={{ ...styles.confidenceFill, width: `${item.confidence}%`, backgroundColor: '#4C6EF5' }} />
+                    <div style={{ ...styles.confidenceFill, width: `${item.confidence}%`, backgroundColor: '#EF4444' }} />
                   </div>
                   <p style={styles.confidenceText}>AI 확신도 {Number(item.confidence).toFixed(1)}%</p>
-                  <span style={styles.tempTagGreen}>🌡 {item.tempLabel}</span>
-                </>
-              ) : (
-                <p style={{ color: '#94A3B8', fontSize: '0.82rem', marginTop: '8px' }}>
-                  📷 사진 업로드 시 AI 분류 가능
-                </p>
-              )}
+                  <span style={styles.tempTagRed}>🌡 {item.tempLabel}</span>
+                  <p style={styles.worstMsg}>오늘 날씨엔 비추천 🙅</p>
+                </div>
+              ))}
             </div>
-          )) : (
-            <div style={styles.emptyRecommend}>
-              <p>😅 오늘 날씨에 맞는 옷이 없어요!</p>
-              <p style={{ fontSize: '0.9rem', color: '#94A3B8' }}>
-                {clothes.length > 0 ? '사진을 업로드해서 AI 분류를 받아보세요.' : '옷을 추가해보세요.'}
-              </p>
-            </div>
-          )}
-          {worst && (
-            <div style={styles.worstCard}>
-              <div style={styles.worstBadge}>❌ WORST{isSample ? ' (샘플)' : ''}</div>
-              <RecommendImage item={worst} style={styles.recommendImg} />
-              <p style={styles.recommendName}>{worst.name || worst.title}</p>
-              <p style={styles.recommendCategory}>{worst.category}</p>
-              <div style={styles.confidenceBar}>
-                <div style={{ ...styles.confidenceFill, width: `${worst.confidence}%`, backgroundColor: '#EF4444' }} />
-              </div>
-              <p style={styles.confidenceText}>AI 확신도 {Number(worst.confidence).toFixed(1)}%</p>
-              <span style={styles.tempTagRed}>🌡 {worst.tempLabel}</span>
-              <p style={styles.worstMsg}>오늘 날씨엔 비추천 🙅</p>
-            </div>
-          )}
-        </div>
+          </>
+        )}
       </section>
 
       {/* ✅ 전체 코디 추천 — 항상 샘플 카드 */}
@@ -1166,6 +1249,56 @@ const handleEditSave = async () => {
         </div>
       </main>
 
+      {showProfileModal && profileInfo && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modal}>
+            <h3 style={{ marginBottom: '20px', color: '#1E293B' }}>👤 내 정보</h3>
+
+            <div style={{ backgroundColor: '#F8FAFC', borderRadius: '12px', padding: '16px', marginBottom: '24px' }}>
+              <p style={{ margin: '0 0 4px 0', color: '#64748B', fontSize: '0.85rem' }}>아이디</p>
+              <p style={{ margin: '0 0 16px 0', fontWeight: '700', color: '#1E293B' }}>{profileInfo.username}</p>
+              <p style={{ margin: '0 0 4px 0', color: '#64748B', fontSize: '0.85rem' }}>닉네임</p>
+              <p style={{ margin: '0 0 16px 0', fontWeight: '700', color: '#1E293B' }}>{profileInfo.nickname}</p>
+              <p style={{ margin: '0 0 4px 0', color: '#64748B', fontSize: '0.85rem' }}>가입일</p>
+              <p style={{ margin: 0, fontWeight: '700', color: '#1E293B' }}>
+                {new Date(profileInfo.created_at).toLocaleDateString('ko-KR')}
+              </p>
+            </div>
+
+            <h4 style={{ marginBottom: '16px', color: '#1E293B' }}>🔒 비밀번호 변경</h4>
+            <input type="password" placeholder="현재 비밀번호" value={passwordForm.current}
+              onChange={e => setPasswordForm(prev => ({ ...prev, current: e.target.value }))} style={styles.input} />
+            <input type="password" placeholder="새 비밀번호" value={passwordForm.new}
+              onChange={e => setPasswordForm(prev => ({ ...prev, new: e.target.value }))} style={styles.input} />
+            <input type="password" placeholder="새 비밀번호 확인" value={passwordForm.confirm}
+              onChange={e => setPasswordForm(prev => ({ ...prev, confirm: e.target.value }))} style={styles.input} />
+            {passwordMsg && (
+              <p style={{ color: passwordMsg.startsWith('✅') ? '#059669' : '#EF4444', fontSize: '0.9rem', marginBottom: '12px' }}>
+                {passwordMsg}
+              </p>
+            )}
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '20px' }}>
+              <button onClick={handlePasswordChange} style={styles.confirmBtn}>변경하기</button>
+              <button onClick={() => setShowProfileModal(false)} style={styles.cancelBtn}>닫기</button>
+            </div>
+
+            <div style={{ paddingTop: '20px', borderTop: '1px solid #E2E8F0' }}>
+              <button onClick={() => { setShowProfileModal(false); handleWithdraw(); }} style={{
+                width: '100%',
+                backgroundColor: 'transparent',
+                color: '#94A3B8',
+                border: '1px solid #E2E8F0',
+                padding: '10px',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '0.85rem'
+              }}>회원탈퇴</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 옷 추가 모달 */}
       {showAddModal && (
         <div style={styles.modalOverlay}>
@@ -1275,9 +1408,17 @@ const styles = {
   recommendSection: { maxWidth: '1100px', margin: '0 auto 60px auto' },
   sectionTitle: { fontSize: '1.5rem', fontWeight: '700', color: '#1E293B', marginBottom: '24px' },
   sampleNote: { color: '#94A3B8', marginBottom: '20px', fontSize: '1rem' },
-  bestWorstRow: { display: 'flex', gap: '24px', flexWrap: 'wrap' },
-  bestCard: { backgroundColor: 'white', borderRadius: '24px', padding: '24px', textAlign: 'center', boxShadow: '0 4px 20px rgba(76,110,245,0.15)', border: '2px solid #4C6EF5', flex: '1', minWidth: '200px', maxWidth: '260px', position: 'relative' },
-  worstCard: { backgroundColor: 'white', borderRadius: '24px', padding: '24px', textAlign: 'center', boxShadow: '0 4px 20px rgba(239,68,68,0.15)', border: '2px solid #EF4444', flex: '1', minWidth: '200px', maxWidth: '260px', position: 'relative' },
+  bestWorstRow: { 
+  display: 'flex', 
+  gap: '24px', 
+  flexWrap: 'nowrap', 
+  overflowX: 'auto', 
+  paddingBottom: '8px',
+  paddingTop: '20px',  // ← 추가
+  WebkitOverflowScrolling: 'touch' 
+},
+  bestCard: { backgroundColor: 'white', borderRadius: '24px', padding: '24px', textAlign: 'center', boxShadow: '0 4px 20px rgba(76,110,245,0.15)', border: '2px solid #4C6EF5', flex: '1', minWidth: '200px', maxWidth: '260px', position: 'relative', paddingTop: '28px' },
+  worstCard: { backgroundColor: 'white', borderRadius: '24px', padding: '24px', textAlign: 'center', boxShadow: '0 4px 20px rgba(239,68,68,0.15)', border: '2px solid #EF4444', flex: '1', minWidth: '200px', maxWidth: '260px', position: 'relative', paddingTop: '28px' },
   bestBadge: { position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)', backgroundColor: '#4C6EF5', color: 'white', padding: '4px 16px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: '700', whiteSpace: 'nowrap' },
   worstBadge: { position: 'absolute', top: '-14px', left: '50%', transform: 'translateX(-50%)', backgroundColor: '#EF4444', color: 'white', padding: '4px 16px', borderRadius: '20px', fontSize: '0.85rem', fontWeight: '700', whiteSpace: 'nowrap' },
   recommendImg: { width: '100%', height: '160px', objectFit: 'cover', borderRadius: '16px', marginBottom: '12px', marginTop: '8px' },
