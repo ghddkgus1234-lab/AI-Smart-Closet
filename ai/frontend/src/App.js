@@ -200,20 +200,18 @@ function getOutfitTip(temp, code) {
 }
 
 const CITIES = [
-  // 🇰🇷 국내
-  { name: '서울', lat: 37.5665, lon: 126.9780 },
-  { name: '부산', lat: 35.1796, lon: 129.0756 },
-  { name: '제주', lat: 33.4996, lon: 126.5312 },
-  // 🌏 해외
-  { name: '시드니', lat: -33.8688, lon: 151.2093 },
-  { name: '방콕', lat: 13.7563, lon: 100.5018 },
-  { name: '두바이', lat: 25.2048, lon: 55.2708 },
-  { name: '런던', lat: 51.5074, lon: -0.1278 },
-  { name: '모스크바', lat: 55.7558, lon: 37.6173 },
-  { name: '상파울루', lat: -23.5505, lon: -46.6333 },
-  { name: '케이프타운', lat: -33.9249, lon: 18.4241 },
-  { name: '뉴욕', lat: 40.7128, lon: -74.0060 },
-  { name: '레이캬비크', lat: 64.1355, lon: -21.8954 },
+  { name: '서울', lat: 37.5665, lon: 126.9780, timezone: 'Asia/Seoul' },
+  { name: '부산', lat: 35.1796, lon: 129.0756, timezone: 'Asia/Seoul' },
+  { name: '제주', lat: 33.4996, lon: 126.5312, timezone: 'Asia/Seoul' },
+  { name: '시드니', lat: -33.8688, lon: 151.2093, timezone: 'Australia/Sydney' },
+  { name: '방콕', lat: 13.7563, lon: 100.5018, timezone: 'Asia/Bangkok' },
+  { name: '두바이', lat: 25.2048, lon: 55.2708, timezone: 'Asia/Dubai' },
+  { name: '런던', lat: 51.5074, lon: -0.1278, timezone: 'Europe/London' },
+  { name: '모스크바', lat: 55.7558, lon: 37.6173, timezone: 'Europe/Moscow' },
+  { name: '상파울루', lat: -23.5505, lon: -46.6333, timezone: 'America/Sao_Paulo' },
+  { name: '케이프타운', lat: -33.9249, lon: 18.4241, timezone: 'Africa/Johannesburg' },
+  { name: '뉴욕', lat: 40.7128, lon: -74.0060, timezone: 'America/New_York' },
+  { name: '레이캬비크', lat: 64.1355, lon: -21.8954, timezone: 'Atlantic/Reykjavik' },
 ];
 
 const COLOR_MAP = {
@@ -569,9 +567,9 @@ function App() {
       .sort((a, b) => {
         const diffA = Math.abs((tempLabelToTemp[a.tempLabel] ?? 15) - weather.temp);
         const diffB = Math.abs((tempLabelToTemp[b.tempLabel] ?? 15) - weather.temp);
-        return diffB - diffA;
+        if (diffB !== diffA) return diffB - diffA;
+        return b.confidence - a.confidence; // 같은 구간이면 확신도 높은 순
       });
-
     if (matched.length > 0) {
       return { best: matched.slice(0, 3), worst: unmatched.slice(0, 2), isSample: true, isUnclassified: false };
     }
@@ -800,36 +798,36 @@ function App() {
     }));
  
   } catch (err) {
-  // 최대 3번 재시도
-  let retryCount = 0;
-  let success = false;
-  
-  while (retryCount < 3 && !success) {
-    try {
-      retryCount++;
-      setAiResult(null);
-      // AI 로딩 메시지 업데이트
-      console.log(`재시도 ${retryCount}번째...`);
-      await new Promise(resolve => setTimeout(resolve, 3000)); // 3초 대기
-      
-      // 업로드부터 다시 시도
-      const retryFormData = new FormData();
-      retryFormData.append('files', file);
-      const retryUpload = await fetch('https://jangso-smart-closet-ai.hf.space/gradio_api/upload', {
-        method: 'POST',
-        body: retryFormData,
-      });
-      if (retryUpload.ok) success = true;
-    } catch {
-      // 계속 재시도
+    let retryCount = 0;
+    let success = false;
+    
+    while (retryCount < 3 && !success) {
+      try {
+        retryCount++;
+        setAiResult(null);
+        console.log(`재시도 ${retryCount}번째...`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        const retryFormData = new FormData();
+        retryFormData.append('files', file);
+        const retryUpload = await fetch('https://jangso-smart-closet-ai.hf.space/gradio_api/upload', {
+          method: 'POST',
+          body: retryFormData,
+        });
+        if (retryUpload.ok) success = true;
+      } catch {
+        // 계속 재시도
+      }
     }
+    
+    if (!success) {
+      setAiResult({ error: 'AI 서버가 불안정해요. 잠시 후 다시 시도해주세요.' });
+    }
+  } finally {
+    setAiLoading(false);
   }
-  
-  if (!success) {
-    setAiResult({ error: 'AI 서버가 불안정해요. 잠시 후 다시 시도해주세요.' });
-  }
-}
 };
+
 const handleAddClothes = async () => {
   if (!newItem.name) return alert('이름을 입력해주세요!');
 
@@ -865,7 +863,6 @@ const handleAddClothes = async () => {
   setAiResult(null);
   setShowAddModal(false);
 };
-
 const handleDelete = async (id) => {
   try {
     await deleteCloth(id);
@@ -1077,6 +1074,11 @@ const handleEditSave = async () => {
             </select>
           </div>
           <p style={styles.cardContent}>{weatherLoading ? '불러오는 중...' : `${weather.temp}°C / ${weather.text}`}</p>
+          {!weatherLoading && selectedCity.timezone && (
+            <p style={{ fontSize: '0.85rem', color: '#94A3B8', marginTop: '4px' }}>
+              🕐 {new Date().toLocaleTimeString('ko-KR', { timeZone: selectedCity.timezone, hour: '2-digit', minute: '2-digit' })}
+            </p>
+          )}
         </div>
         <div style={styles.cardHighlight}>
           <div style={{ fontSize: '36px' }}>✨</div>
@@ -1217,6 +1219,7 @@ const handleEditSave = async () => {
             {[
               { key: 'category', label: '👕 카테고리별' },
               { key: 'color',    label: '🎨 색상별' },
+              { key: 'temp',     label: '🌡 온도 구간별' },
             ].map(tab => (
               <button
                 key={tab.key}
@@ -1274,7 +1277,7 @@ const handleEditSave = async () => {
                   </PieChart>
                 </ResponsiveContainer>
               </>
-            ) : (
+            ) : statsTab === 'color' ? (
               <>
                 <p style={{ color: '#94A3B8', marginBottom: '24px', fontSize: '0.95rem' }}>
                   상위 8개 색상 기준
@@ -1297,6 +1300,39 @@ const handleEditSave = async () => {
                           key={index}
                           fill={COLOR_MAP[entry.name] || CHART_COLORS[index % CHART_COLORS.length]}
                         />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => [`${value}벌`, '수량']} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </>
+            ) : (
+              <>
+                <p style={{ color: '#94A3B8', marginBottom: '24px', fontSize: '0.95rem' }}>
+                  AI가 분류한 온도 구간별 옷 분포
+                </p>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={(() => {
+                        const counts = {};
+                        clothes.forEach(c => {
+                          if (c.tempLabel) counts[c.tempLabel] = (counts[c.tempLabel] || 0) + 1;
+                        });
+                        return Object.entries(counts).map(([name, value]) => ({ name, value }));
+                      })()}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={110}
+                      dataKey="value"
+                      label={({ name, value, percent }) =>
+                        `${name} ${value}벌 (${(percent * 100).toFixed(0)}%)`
+                      }
+                      labelLine={true}
+                    >
+                      {['#F97316', '#4C6EF5', '#06B6D4', '#8B5CF6'].map((color, index) => (
+                        <Cell key={index} fill={color} />
                       ))}
                     </Pie>
                     <Tooltip formatter={(value) => [`${value}벌`, '수량']} />
