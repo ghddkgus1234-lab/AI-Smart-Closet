@@ -412,6 +412,7 @@ function App() {
   const [profileInfo, setProfileInfo] = useState(null);
   const [passwordForm, setPasswordForm] = useState({ current: '', new: '', confirm: '' });
   const [passwordMsg, setPasswordMsg] = useState('');
+  const [search, setSearch] = useState('');
 
   const getCategoryStats = () => {
       const counts = {};
@@ -880,7 +881,9 @@ const handleEditSave = async () => {
 
   if (!token) return <AuthPage onLogin={handleLogin} />;
 
-  const filteredClothes = filter === '전체' ? clothes : clothes.filter(item => item.category === filter);
+  const filteredClothes = clothes
+    .filter(item => filter === '전체' || item.category === filter)
+    .filter(item => item.name.includes(search));
 
   // 안내 메시지 결정
   const recommendNote = clothesLoading
@@ -1242,6 +1245,22 @@ const handleEditSave = async () => {
             setAiResult(null);
           }} style={styles.addBtn}>+ 옷 추가</button>
         </div>
+
+        <input
+          placeholder="🔍 옷 이름으로 검색"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{
+            width: '100%',
+            padding: '14px',
+            borderRadius: '14px',
+            border: '1px solid #E2E8F0',
+            fontSize: '1rem',
+            marginBottom: '16px',
+            boxSizing: 'border-box',
+            outline: 'none',
+          }}
+        />
         <div style={styles.filterBar}>
           {['전체', '상의', '하의', '아우터', '신발'].map(cat => (
             <button key={cat} onClick={() => setFilter(cat)} style={{
