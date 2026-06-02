@@ -131,9 +131,9 @@ const SAMPLE_ITEMS = [
   'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=400&q=80',
 ], tempLabel: '쌀쌀(9~15°C)', confidence: 85.1 },
   
-  { id: 's4', title: '데님 반바지',   category: '하의',   images: [
-    'https://images.unsplash.com/photo-1565084888279-aca607bb7e1e?w=400&q=80',
-  ], tempLabel: '더움(25°C~)',    confidence: 90.5 },
+  { id: 's4', title: '데님 반바지', category: '하의', images: [
+  'https://images.unsplash.com/photo-1651694558313-fdfc4ee862ba?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+], tempLabel: '더움(25°C~)', confidence: 90.5 },
   
   { id: 's5', title: '미디 스커트',   category: '하의',   images: [
     'https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=400&q=80',
@@ -800,10 +800,35 @@ function App() {
     }));
  
   } catch (err) {
-    setAiResult({ error: 'AI 서버에 연결할 수 없습니다.' });
-  } finally {
-    setAiLoading(false);
+  // 최대 3번 재시도
+  let retryCount = 0;
+  let success = false;
+  
+  while (retryCount < 3 && !success) {
+    try {
+      retryCount++;
+      setAiResult(null);
+      // AI 로딩 메시지 업데이트
+      console.log(`재시도 ${retryCount}번째...`);
+      await new Promise(resolve => setTimeout(resolve, 3000)); // 3초 대기
+      
+      // 업로드부터 다시 시도
+      const retryFormData = new FormData();
+      retryFormData.append('files', file);
+      const retryUpload = await fetch('https://jangso-smart-closet-ai.hf.space/gradio_api/upload', {
+        method: 'POST',
+        body: retryFormData,
+      });
+      if (retryUpload.ok) success = true;
+    } catch {
+      // 계속 재시도
+    }
   }
+  
+  if (!success) {
+    setAiResult({ error: 'AI 서버가 불안정해요. 잠시 후 다시 시도해주세요.' });
+  }
+}
 };
 const handleAddClothes = async () => {
   if (!newItem.name) return alert('이름을 입력해주세요!');
