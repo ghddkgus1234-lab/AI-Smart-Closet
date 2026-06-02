@@ -234,6 +234,7 @@ const COLOR_MAP = {
   '카키': '#646e3c',
   '민트': '#64d2be',
   '퍼플': '#823cb4',
+  '데님': '#4A677F',
   '라벤더': '#bea0dc',
   '브라운': '#6e411e',
   '베이지': '#d2b996',
@@ -413,6 +414,7 @@ function App() {
   const [passwordForm, setPasswordForm] = useState({ current: '', new: '', confirm: '' });
   const [passwordMsg, setPasswordMsg] = useState('');
   const [search, setSearch] = useState('');
+  const [editColorLoading, setEditColorLoading] = useState(false);
 
   const getCategoryStats = () => {
       const counts = {};
@@ -853,8 +855,56 @@ const handleEditOpen = (item) => {
     name: item.name,
     category: item.category,
     color: item.color || '',
+    imageUrl: item.imageUrl || '', // ← 이거 추가
   });
   setShowEditModal(true);
+};
+
+const handleReClassifyColor = async () => {
+  if (!editItem?.imageUrl) return alert('저장된 이미지가 없어요!');
+  
+  setEditColorLoading(true);
+  try {
+    // 이미지 URL → Blob 변환
+    const imgRes = await fetch(editItem.imageUrl);
+    const blob = await imgRes.blob();
+    const file = new File([blob], 'image.jpg', { type: blob.type });
+
+    const formData = new FormData();
+    formData.append('files', file);
+
+    const uploadRes = await fetch('https://jangso-smart-closet-ai.hf.space/gradio_api/upload', {
+      method: 'POST',
+      body: formData,
+    });
+    const uploadedPaths = await uploadRes.json();
+    const filePath = uploadedPaths[0];
+
+    const colorRes = await fetch('https://jangso-smart-closet-ai.hf.space/gradio_api/call/gradio_color', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: [{ path: filePath }] }),
+    });
+    const { event_id } = await colorRes.json();
+    const resultRes = await fetch(
+      `https://jangso-smart-closet-ai.hf.space/gradio_api/call/gradio_color/${event_id}`
+    );
+    const text = await resultRes.text();
+    const dataLine = text.split('\n').find(line => line.startsWith('data:'));
+    const json = JSON.parse(dataLine.replace('data: ', ''));
+    const newColor = json[0]?.replace('주요 색상: ', '') || '';
+
+    if (newColor && newColor !== editItem.color) {
+      setEditItem(prev => ({ ...prev, color: newColor }));
+      alert(`색상이 "${editItem.color}" → "${newColor}" 로 변경됐어요!`);
+    } else {
+      alert(`기존 색상(${editItem.color})과 동일해요!`);
+    }
+  } catch {
+    alert('색상 재분류에 실패했어요.');
+  } finally {
+    setEditColorLoading(false);
+  }
 };
 
 const handleEditSave = async () => {
@@ -1448,6 +1498,25 @@ const handleEditSave = async () => {
               onChange={e => setEditItem(prev => ({ ...prev, color: e.target.value }))}
               style={styles.input}
             />
+            {editItem?.imageUrl && (
+              <button
+                onClick={handleReClassifyColor}
+                disabled={editColorLoading}
+                style={{
+                  width: '100%',
+                  backgroundColor: editColorLoading ? '#E2E8F0' : '#EEF2FF',
+                  color: editColorLoading ? '#94A3B8' : '#4C6EF5',
+                  border: '2px solid #4C6EF5',
+                  padding: '12px',
+                  borderRadius: '12px',
+                  cursor: editColorLoading ? 'not-allowed' : 'pointer',
+                  fontWeight: '700',
+                  marginBottom: '16px',
+                }}
+              >
+                {editColorLoading ? '🤖 분류 중...' : '🎨 색상 재분류'}
+              </button>
+            )}
             <div style={{ display: 'flex', gap: '12px' }}>
               <button onClick={handleEditSave} style={styles.confirmBtn}>저장하기</button>
               <button onClick={() => { setShowEditModal(false); setEditItem(null); }} style={styles.cancelBtn}>취소</button>
