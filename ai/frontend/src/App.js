@@ -3,6 +3,7 @@ import AuthPage from './AuthPage';
 import { getClothes, addCloth, deleteCloth, updateCloth } from './api';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
+const BASE = 'https://smartcloset-backend.onrender.com/api';
 const GEMINI_API_KEY = process.env.REACT_APP_GEMINI_API_KEY;
 
 // ✅ 전체 코디 추천 카드용 (항상 샘플로 표시)
@@ -131,7 +132,6 @@ const SAMPLE_ITEMS = [
 ], tempLabel: '쌀쌀(9~15°C)', confidence: 85.1 },
   
   { id: 's4', title: '데님 반바지',   category: '하의',   images: [
-    'https://images.unsplash.com/photo-1591195853828-11db59a44f43?w=400&q=80',
     'https://images.unsplash.com/photo-1565084888279-aca607bb7e1e?w=400&q=80',
   ], tempLabel: '더움(25°C~)',    confidence: 90.5 },
   
@@ -605,7 +605,7 @@ function App() {
   const handleProfileOpen = async () => {
     console.log('token:', token);
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/me`, {
+      const res = await fetch(`${BASE}/auth/me`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const data = await res.json();
@@ -624,7 +624,7 @@ function App() {
     if (passwordForm.new.length < 4)
       return setPasswordMsg('❌ 비밀번호는 4자 이상이어야 해요');
     try {
-      const res = await fetch(`${process.env.REACT_APP_API_URL}/api/auth/password`, {
+      const res = await fetch(`${BASE}/auth/me`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ currentPassword: passwordForm.current, newPassword: passwordForm.new })
@@ -644,7 +644,7 @@ function App() {
   const handleWithdraw = async () => {
     if (!window.confirm('정말 탈퇴하시겠어요? 모든 옷장 데이터가 삭제됩니다.')) return;
     try {
-      await fetch(`${process.env.REACT_APP_API_URL}/api/auth/withdraw`, {
+      await fetch(`${BASE}/auth/me`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -653,10 +653,57 @@ function App() {
       alert('탈퇴에 실패했어요: ' + err.message);
     }
   };
-  const handleCategoryChange = (e) => {
-    setNewItem(prev => ({ ...prev, category: e.target.value, tempLabel: '', confidence: 0 }));
-    setAiResult(null);
-  };
+  const handleCategoryChange = async (e) => {
+  const newCategory = e.target.value;
+  setNewItem(prev => ({ ...prev, category: newCategory, tempLabel: '', confidence: 0 }));
+  setAiResult(null);
+
+  // 이미 업로드된 사진이 있으면 새 카테고리로 재분류
+  if (newItem.file) {
+    const categoryToEndpoint = { '상의': 'top', '하의': 'bottoms', '아우터': 'outer' };
+    const endpoint = categoryToEndpoint[newCategory];
+    if (!endpoint) return; // 신발은 분류 안 함
+
+    setAiLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('files', newItem.file);
+
+      const uploadRes = await fetch('https://jangso-smart-closet-ai.hf.space/gradio_api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const uploadedPaths = await uploadRes.json();
+      const filePath = uploadedPaths[0];
+
+      const tempRes = await fetch('https://jangso-smart-closet-ai.hf.space/gradio_api/call/gradio_predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: [{ path: filePath }, newCategory] }),
+      });
+
+      const { event_id } = await tempRes.json();
+      const resultRes = await fetch(
+        `https://jangso-smart-closet-ai.hf.space/gradio_api/call/gradio_predict/${event_id}`
+      );
+      const text = await resultRes.text();
+      const dataLine = text.split('\n').find(line => line.startsWith('data:'));
+      const json = JSON.parse(dataLine.replace('data: ', ''));
+      const labelStr = json[0];
+      const allProbs = json[1] || {};
+      const label = labelStr.replace(/\s+\(\d+\.?\d*%\)$/, '');
+      const confidence = parseFloat(labelStr.match(/\((\d+\.?\d*)%\)/)?.[1] || '0');
+
+      setAiResult({ label, confidence, all_probs: allProbs, color: newItem.color });
+      setNewItem(prev => ({ ...prev, tempLabel: label, confidence }));
+    } catch {
+      setAiResult({ error: 'AI 재분류에 실패했어요.' });
+    } finally {
+      setAiLoading(false);
+    }
+  }
+};
+
   const handleImageUpload = async (e) => {
   const file = e.target.files[0];
   if (!file) return;
