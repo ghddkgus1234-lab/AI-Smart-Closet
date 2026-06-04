@@ -413,6 +413,7 @@ function App() {
   const [passwordMsg, setPasswordMsg] = useState('');
   const [search, setSearch] = useState('');
   const [editColorLoading, setEditColorLoading] = useState(false);
+  const [showImgFull, setShowImgFull] = useState(false);
 
   const getCategoryStats = () => {
       const counts = {};
@@ -1163,6 +1164,25 @@ const handleEditSave = async () => {
                 </div>
               ))}
             </div>
+            {/* 쇼핑 연결 버튼 */}
+            {best.length > 0 && (
+              <div style={{ textAlign: 'center', marginTop: '24px' }}>
+                <p style={{ color: '#94A3B8', fontSize: '0.9rem', marginBottom: '12px' }}>
+                  원하는 옷이 없으신가요?
+                </p>
+                <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                  {[
+                    { name: '무신사', url: 'https://www.musinsa.com' },
+                    { name: '에이블리', url: 'https://a-bly.com' },
+                    { name: '지그재그', url: 'https://zigzag.kr' },
+                  ].map(({ name, url }) => (
+                    <a key={name} href={url} target="_blank" rel="noopener noreferrer" style={styles.shopBtn}>
+                      🛍 {name}에서 찾기
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </>
         )}
       </section>
@@ -1386,7 +1406,12 @@ const handleEditSave = async () => {
           {filteredClothes.length > 0 ? filteredClothes.map((item) => (
             <div key={item.id} style={styles.clothesCard}>
               {item.imageUrl
-                ? <img src={item.imageUrl} alt={item.name} style={styles.clothesImg} />
+                ? <img
+                    src={item.imageUrl}
+                    alt={item.name}
+                    style={{ ...styles.clothesImg, cursor: 'pointer' }}
+                    onClick={() => { setShowImgFull(true); setEditItem(item); }}
+                  />
                 : <div style={styles.icon}>{item.category === '상의' ? '👕' : item.category === '하의' ? '👖' : '👟'}</div>
               }
               <h4 style={styles.clothesName}>{item.name}</h4>
@@ -1560,6 +1585,14 @@ const handleEditSave = async () => {
               style={styles.input}
             />
             {editItem?.imageUrl && (
+              <img
+                src={editItem.imageUrl}
+                alt="옷 사진"
+                onClick={() => setShowImgFull(true)}
+                style={{ width: '100%', borderRadius: '12px', marginBottom: '16px', maxHeight: '200px', objectFit: 'cover', cursor: 'pointer' }}
+              />
+            )}
+            {editItem?.imageUrl && (
               <button
                 onClick={handleReClassifyColor}
                 disabled={editColorLoading}
@@ -1584,7 +1617,14 @@ const handleEditSave = async () => {
             </div>
           </div>
         </div>
-      )}
+      )} {showImgFull && (
+          <div
+            onClick={() => setShowImgFull(false)}
+            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, cursor: 'pointer' }}
+          >
+            <img src={editItem?.imageUrl} alt="전체보기" style={{ maxWidth: '90%', maxHeight: '90%', borderRadius: '16px' }} />
+          </div>
+        )}
 
       <Chatbot clothes={clothes} weather={weather} />
     </div>
@@ -1662,6 +1702,17 @@ const styles = {
   uploadLabel: { display: 'block', textAlign: 'center', padding: '14px', borderRadius: '12px', border: '2px dashed #CBD5E0', cursor: 'pointer', color: '#64748B', fontWeight: '600', marginBottom: '16px' },
   confirmBtn: { flex: 1, backgroundColor: '#4C6EF5', color: 'white', border: 'none', padding: '14px', borderRadius: '12px', cursor: 'pointer', fontWeight: '700', fontSize: '1rem' },
   cancelBtn: { flex: 1, backgroundColor: '#F1F5F9', color: '#64748B', border: 'none', padding: '14px', borderRadius: '12px', cursor: 'pointer', fontWeight: '700', fontSize: '1rem' },
+  shopBtn: { 
+  backgroundColor: '#F8FAFC', 
+  color: '#4C6EF5', 
+  border: '2px solid #4C6EF5', 
+  padding: '10px 20px', 
+  borderRadius: '12px', 
+  fontWeight: '700', 
+  fontSize: '0.9rem', 
+  textDecoration: 'none',
+  whiteSpace: 'nowrap',
+},
   aiResultBox: { backgroundColor: '#EEF2FF', borderRadius: '12px', padding: '14px 18px', marginBottom: '16px', border: '1.5px solid #4C6EF5' },
   aiResultTitle: { margin: 0, fontWeight: '700', color: '#1E293B', fontSize: '0.95rem' },
   aiConfidence: { color: '#94A3B8', fontWeight: '400', marginLeft: '8px' },
